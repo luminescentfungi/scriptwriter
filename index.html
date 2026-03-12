@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Collaborative Theatre Writer</title>
+  <link rel="stylesheet" href="./styles/main.css">
+</head>
+<body>
+  <header class="app-header warm">
+    <div class="brand">🎭 <span data-i18n="appName">Collaborative Theatre Writer</span></div>
+    <div class="header-actions">
+      <label for="languageSelect" data-i18n="languageLabel">Language</label>
+      <select id="languageSelect" aria-label="Language selector">
+        <option value="en">English</option>
+        <option value="es">Español</option>
+      </select>
+    </div>
+  </header>
+
+  <main class="landing-shell">
+    <section id="homePanel" class="card hero-card">
+      <h1 data-i18n="homeTitle">Write theatre scripts together in real time</h1>
+      <p data-i18n="homeDescription">Create a room, define your project details, and collaborate on a theatre script with live updates.</p>
+      <div class="actions-row">
+        <button id="goWizard" class="primary" data-i18n="createRoom">Create new room</button>
+      </div>
+    </section>
+
+    <section id="joinPanel" class="card">
+      <h2 data-i18n="joinExisting">Join existing room</h2>
+      <form id="joinForm" class="form-grid">
+        <label>
+          <span data-i18n="yourName">Your name</span>
+          <input type="text" id="joinName" maxlength="24" required>
+        </label>
+        <label>
+          <span data-i18n="roomCode">Room code</span>
+          <input type="text" id="joinCode" maxlength="4" minlength="4" pattern="[0-9]{4}" required>
+        </label>
+        <button type="submit" class="primary" data-i18n="joinRoom">Join room</button>
+      </form>
+    </section>
+
+    <section id="wizardPanel" class="card hidden">
+      <h2 id="wizardHeading" data-i18n="wizardTitle">Create a new script room</h2>
+      <p id="wizardSubtitle" data-i18n="wizardDescription">Complete the details and generate a 4-digit room code automatically.</p>
+
+      <form id="wizardForm" class="form-grid">
+        <label>
+          <span data-i18n="yourName">Your name</span>
+          <input type="text" id="wizardName" maxlength="24" required>
+        </label>
+        <label>
+          <span data-i18n="scriptTitle">Script title</span>
+          <input type="text" id="scriptTitle" maxlength="80" required>
+        </label>
+        <label>
+          <span data-i18n="scriptArgument">Plot / argument</span>
+          <textarea id="scriptArgument" rows="3" maxlength="600" required></textarea>
+        </label>
+        <label>
+          <span data-i18n="scriptCharacters">Characters (comma separated)</span>
+          <textarea id="scriptCharacters" rows="2" maxlength="300" required></textarea>
+        </label>
+        <label>
+          <span data-i18n="scriptSetting">Setting</span>
+          <input type="text" id="scriptSetting" maxlength="80">
+        </label>
+        <label>
+          <span data-i18n="scriptGenre">Genre</span>
+          <input type="text" id="scriptGenre" maxlength="60">
+        </label>
+
+        <div class="wizard-actions">
+          <button type="button" id="backHome" class="secondary" data-i18n="back">Back</button>
+          <button type="button" id="backToEditor" class="secondary hidden" data-i18n="backToEditor">Back to editor</button>
+          <button type="submit" class="primary" id="wizardSubmit" data-i18n="generateRoom">Generate room</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

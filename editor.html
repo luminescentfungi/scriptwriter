@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Script IDE</title>
+  <link rel="stylesheet" href="./styles/editor.css">
+</head>
+<body>
+  <header class="editor-header">
+    <button id="goHome" class="ghost" data-i18n="home">Home</button>
+    <div class="editor-room" id="roomLabel">Room ----</div>
+    <div class="editor-actions">
+      <label for="languageSelect" data-i18n="languageLabel">Language</label>
+      <select id="languageSelect" aria-label="Language selector">
+        <option value="en">English</option>
+        <option value="es">Español</option>
+      </select>
+    </div>
+  </header>
+
+  <main class="editor-shell">
+    <section id="metaCard" class="meta-card" tabindex="0" role="button" aria-label="Edit room metadata">
+      <h1 id="metaTitle"></h1>
+      <p id="metaSubtitle"></p>
+      <p id="metaCharacters"></p>
+      <div class="meta-presence">
+        <span class="presence-label" data-i18n="onlineUsers">Online users</span>
+        <div id="presenceInline" class="presence-inline"></div>
+      </div>
+      <p class="meta-hint" data-i18n="tapToEditMetadata">Tap here to edit metadata</p>
+    </section>
+
+    <section id="scriptViewport" class="script-viewport">
+      <div id="scriptCanvas" class="script-canvas"></div>
+    </section>
+  </main>
+
+  <footer class="command-panel">
+    <div class="row characters" id="characterButtons"></div>
+    <div class="row compact" id="modeRow">
+      <button id="modeNormal" class="secondary active" data-i18n="modeNormal">Normal</button>
+      <button id="modeDescription" class="secondary" data-i18n="modeDescription">Description</button>
+    </div>
+  </footer>
+
+  <script type="module" src="./js/editor-page.js"></script>
+</body>
+</html>
