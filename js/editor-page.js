@@ -222,17 +222,17 @@ function applyCharacterToSelection(character) {
   console.log("Applying character", character, "to active block", activeBlock);
 
   if (!activeBlock || activeBlock.type !== "paragraph") {
-    showPanelNotice("Character ignored");
+    showPanelNotice("Crea un nuevo bloque en blanco para añadir un personaje.");
     return;
   }
 
   if (!activeBlock.justCreated) {
-    showPanelNotice("Character ignored: paragraph is not newly created");
+    showPanelNotice("Crea un nuevo bloque en blanco para añadir un personaje.");
     return;
   }
 
   if ((activeBlock.text || "").trim()) {
-    showPanelNotice("Character ignored: paragraph is not empty");
+    showPanelNotice("Crea un nuevo bloque en blanco para añadir un personaje.");
     return;
   }
 
