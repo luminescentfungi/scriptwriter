@@ -24,10 +24,8 @@ const metaSubtitle = document.getElementById("metaSubtitle");
 const metaCharacters = document.getElementById("metaCharacters");
 const scriptCanvas = document.getElementById("scriptCanvas");
 const characterButtons = document.getElementById("characterButtons");
-const modeRow = document.getElementById("modeRow");
-const modeNormal = document.getElementById("modeNormal");
-const modeDescription = document.getElementById("modeDescription");
 const commandPanel = document.querySelector(".command-panel");
+const panelNotice = document.getElementById("panelNotice");
 const presenceInline = document.getElementById("presenceInline");
 const goHome = document.getElementById("goHome");
 const contextMenu = document.createElement("div");
@@ -42,7 +40,6 @@ const state = {
   roomData: null,
   blocks: [],
   activeIndex: -1,
-  currentVariant: "normal",
   saveTimer: null,
   typingLockUntil: 0,
   roomUnsubscribe: null,
@@ -136,14 +133,6 @@ function bindEvents() {
     window.location.href = `./index.html?mode=wizard&room=${state.roomCode}`;
   });
 
-  modeNormal.addEventListener("click", () => {
-    applyVariant("normal");
-  });
-
-  modeDescription.addEventListener("click", () => {
-    applyVariant("description");
-  });
-
   document.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) {
       closeContextMenu();
@@ -195,14 +184,15 @@ function hydrateRoomView() {
 
 function hydrateRoomHeader() {
   const metadata = state.roomData?.metadata || {};
-  const chars = metadata.characters?.length
-    ? metadata.characters.join(", ")
-    : getText(state.language, "noCharacters");
+  let charsStr = getText(state.language, "noCharacters");
+  if (Array.isArray(metadata.characters) && metadata.characters.length) {
+    charsStr = metadata.characters.map(c => typeof c === "object" ? c.name : c).join(", ");
+  }
 
   roomLabel.textContent = `${getText(state.language, "roomLabel")} ${state.roomCode}`;
   metaTitle.textContent = metadata.title || getText(state.language, "untitled");
   metaSubtitle.textContent = `${metadata.setting || "—"} • ${metadata.genre || "—"}`;
-  metaCharacters.textContent = chars;
+  metaCharacters.textContent = charsStr;
 }
 
 function renderCharacterButtons() {
@@ -213,46 +203,48 @@ function renderCharacterButtons() {
   descButton.type = "button";
   descButton.textContent = "📝";
   descButton.addEventListener("click", () => {
-    insertBlock("paragraph", "", state.blocks.length);
+    insertBlock("paragraph", "", state.blocks.length, { justCreated: true });
   });
   characterButtons.appendChild(descButton);
 
-  characters.forEach((character) => {
+  characters.forEach((charObj) => {
+    const characterName = typeof charObj === "object" ? charObj.name : charObj;
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = character;
-    button.addEventListener("click", () => applyCharacterToSelection(character));
+    button.textContent = characterName;
+    button.addEventListener("click", () => applyCharacterToSelection(characterName));
     characterButtons.appendChild(button);
   });
 }
 
 function applyCharacterToSelection(character) {
-  let activeBlock = state.blocks[state.activeIndex];
+  const activeBlock = state.blocks[state.activeIndex];
   console.log("Applying character", character, "to active block", activeBlock);
-  
-  if (!activeBlock || (activeBlock && activeBlock.text.trim())) {
-    console.log("Active block has text or no active block, looking for first empty paragraph");
-    insertBlock("paragraph", "", state.blocks.length);
-    console.log("Created empty paragraph at index", state.blocks.length - 1);
-    state.activeIndex = state.blocks.length - 1;
-    activeBlock = state.blocks[state.activeIndex];
+
+  if (!activeBlock || activeBlock.type !== "paragraph") {
+    showPanelNotice("Character ignored");
+    return;
   }
-  
-  if (activeBlock && !activeBlock.text.trim()) {
-    console.log(`Active block ${state.activeIndex} is empty, converting to dialogue`);
-    activeBlock.type = "dialogue";
-    activeBlock.character = String(character).toUpperCase();
-    activeBlock.variant = "normal";
-    state.currentVariant = "normal";
-    setModeButtons();
-    updateModeRowVisibility();
-    renderBlocks();
-    focusActiveTextAtEnd();
-    scheduleSave();
-    updatePresenceNow(false);
-  } else {
-    console.warn("No suitable block found to apply character. Action aborted.");
+
+  if (!activeBlock.justCreated) {
+    showPanelNotice("Character ignored: paragraph is not newly created");
+    return;
   }
+
+  if ((activeBlock.text || "").trim()) {
+    showPanelNotice("Character ignored: paragraph is not empty");
+    return;
+  }
+
+  console.log(`Active block ${state.activeIndex} is empty paragraph, converting to dialogue`);
+  activeBlock.type = "dialogue";
+  activeBlock.character = String(character).toUpperCase();
+  activeBlock.justCreated = false;
+  state.typingLockUntil = Date.now() + 1000;
+  scheduleSave();
+  renderBlocks();
+  focusActiveTextAtEnd();
+  updatePresenceNow(false);
 }
 
 function renderBlocks() {
@@ -262,7 +254,8 @@ function renderBlocks() {
   state.blocks.forEach((block, index) => {
     const lockedByOther = isBlockLockedByOther(index);
     const node = document.createElement("article");
-    node.className = `block ${block.type} ${block.variant === "description" ? "description" : ""}`;
+    node.className = `block ${block.type}`;
+    node.dataset.index = String(index);
     if (index === state.activeIndex) {
       node.classList.add("active");
     }
@@ -279,25 +272,56 @@ function renderBlocks() {
 
     const textNode = document.createElement("div");
     textNode.className = "block-text";
-    textNode.contentEditable = String(index === state.activeIndex && !lockedByOther);
+    textNode.contentEditable = String(!lockedByOther);
     textNode.spellcheck = true;
-    textNode.textContent = block.text;
+    textNode.innerHTML = formatParenthesisItalics(block.text);
 
     textNode.addEventListener("input", () => {
       console.log(`Input event on block ${index}. Current text length: ${textNode.textContent?.length}`);
       if (isBlockLockedByOther(index)) {
         console.warn(`Block ${index} is locked by another user. Reverting local change.`);
-        textNode.textContent = state.blocks[index].text || "";
+        textNode.innerHTML = formatParenthesisItalics(state.blocks[index].text || "");
         return;
       }
-      const nextRaw = textNode.textContent || "";
+      // Get plain text from the editable div
+      const nextRaw = textNode.innerText || "";
       state.blocks[index].text = nextRaw;
+      if (state.blocks[index].type === "paragraph" && nextRaw.trim()) {
+        state.blocks[index].justCreated = false;
+      }
       state.typingLockUntil = Date.now() + 1000;
       scheduleSave();
       updatePresenceNow(true);
+      // Re-render italics formatting
+      textNode.innerHTML = formatParenthesisItalics(nextRaw);
+      // Restore caret position
+      moveCaretToEnd(textNode);
     });
+// Formats text so that anything between parentheses (including the parentheses) is wrapped in <i> tags.
+function formatParenthesisItalics(text) {
+  if (!text) return "";
+  // Replace (content) with <i>(content)</i>, non-greedy for nested/adjacent
+  return text.replace(/\(([^)]*)\)/g, (match) => `<i>${match}</i>`);
+}
 
     node.appendChild(textNode);
+    textNode.addEventListener("click", () => {
+      console.log(`Block text ${index} clicked.`);
+      if (isBlockLockedByOther(index)) {
+        return;
+      }
+      selectBlock(index, false);
+    });
+
+    textNode.addEventListener("focus", () => {
+      console.log(`Block text ${index} focused.`);
+      if (isBlockLockedByOther(index)) {
+        return;
+      }
+      selectBlock(index, false);
+      updatePresenceNow(false);
+    });
+
     node.addEventListener("click", () => {
       console.log(`Block ${index} clicked.`);
       if (isBlockLockedByOther(index)) {
@@ -353,7 +377,7 @@ function renderBlocks() {
   blankTarget.className = "blank-target";
   blankTarget.addEventListener("click", () => {
     console.log("Blank target clicked. Appending new paragraph at end.");
-    insertBlock("paragraph", "", state.blocks.length);
+    insertBlock("paragraph", "", state.blocks.length, { justCreated: true });
   });
   scriptCanvas.appendChild(blankTarget);
   applyPresenceHighlightsToDom();
@@ -368,14 +392,9 @@ function selectBlock(index, focusEditor) {
 
   const hasChanged = state.activeIndex !== index;
   state.activeIndex = index;
-  const variant = state.blocks[index]?.variant || "normal";
-  state.currentVariant = variant;
-  setModeButtons();
-  updateModeRowVisibility();
 
   if (hasChanged) {
-    console.log("Index changed, re-rendering blocks for highlight.");
-    renderBlocks();
+    syncActiveBlockStyles();
   }
 
   if (!focusEditor) {
@@ -386,13 +405,13 @@ function selectBlock(index, focusEditor) {
     focusActiveTextAtEnd();
   } else {
     console.log("Same block re-selected, ensuring focus and caret position.");
-    const activeText = scriptCanvas.querySelector(".block.active .block-text");
+    const activeText = scriptCanvas.querySelector(`.block[data-index="${state.activeIndex}"] .block-text`);
     if (!activeText) {
       return;
     }
     const activeBlock = state.blocks[state.activeIndex];
     activeText.textContent = activeBlock?.text || "";
-    activeText.contentEditable = "true";
+    activeText.contentEditable = String(!isBlockLockedByOther(state.activeIndex));
     activeText.focus();
     moveCaretToEnd(activeText);
   }
@@ -400,73 +419,23 @@ function selectBlock(index, focusEditor) {
   updatePresenceNow(false);
 }
 
-function applyVariant(nextVariant) {
-  console.log(`Applying variant "${nextVariant}" to current block.`);
-  state.currentVariant = nextVariant;
-  setModeButtons();
-
-  if (state.activeIndex >= 0 && state.blocks[state.activeIndex]) {
-    const activeBlock = state.blocks[state.activeIndex];
-    const previousVariant = activeBlock.variant;
-    if (previousVariant === nextVariant) {
-      console.log("Variant is already set to target. Focusing editor.");
-      focusActiveTextAtEnd();
-      return;
-    }
-
-    const activeText = scriptCanvas.querySelector(".block.active .block-text");
-    if (!activeText) {
-      return;
-    }
-
-    if (nextVariant === "description") {
-      console.log("Converting block to description/parenthetical variant.");
-      const baseText = activeBlock.text || "";
-      const endsWithSpace = /\s$/.test(baseText);
-      const suffix = endsWithSpace || !baseText ? "() " : " ()";
-      activeBlock.text = `${baseText}${suffix}`;
-      activeBlock.variant = "description";
-      renderBlocks();
-      const refreshed = scriptCanvas.querySelector(".block.active .block-text");
-      if (refreshed) {
-        refreshed.focus();
-        placeCaretBeforeClosingParenthesis(refreshed);
-      }
-    } else {
-      console.log("Resetting block to normal variant.");
-      activeBlock.variant = "normal";
-      renderBlocks();
-      focusActiveTextAtEnd();
-    }
-
-    scheduleSave();
-  }
-}
-
-function setModeButtons() {
-  console.log(`Synchronizing mode buttons with state.currentVariant: ${state.currentVariant}`);
-  modeNormal.classList.toggle("active", state.currentVariant === "normal");
-  modeDescription.classList.toggle("active", state.currentVariant === "description");
-}
-
-function insertBlock(type, character = "", targetIndex = null) {
+function insertBlock(type, character = "", targetIndex = null, options = {}) {
   console.log(`Inserting new block of type "${type}" at target index: ${targetIndex}`);
   const index = targetIndex === null
     ? (state.activeIndex >= 0 ? state.activeIndex + 1 : state.blocks.length)
     : targetIndex;
 
-  const variant = type === "paragraph" ? "description" : "normal";
   const block = {
     type,
     character: type === "dialogue" ? String(character || "CHARACTER").toUpperCase() : "",
     text: "",
-    variant
+    justCreated: Boolean(options.justCreated)
   };
 
   state.blocks.splice(index, 0, block);
   state.activeIndex = index;
   console.log(`New block inserted. Updated state.activeIndex to: ${index}`);
-  updateModeRowVisibility();
+  state.typingLockUntil = Date.now() + 1000;
   scheduleSave();
   renderBlocks();
 
@@ -483,7 +452,7 @@ function focusActiveTextAtEnd() {
     return;
   }
 
-  activeText.contentEditable = "true";
+  activeText.contentEditable = String(!isBlockLockedByOther(state.activeIndex));
   activeText.focus();
   moveCaretToEnd(activeText);
 }
@@ -539,12 +508,10 @@ function deleteBlock(index) {
 
   state.blocks.splice(index, 1);
   state.activeIndex = -1;
-  state.currentVariant = "normal";
-  setModeButtons();
-  updateModeRowVisibility();
 
-  renderBlocks();
+  state.typingLockUntil = Date.now() + 1000;
   scheduleSave();
+  renderBlocks();
   updatePresenceNow(false);
 }
 
@@ -607,7 +574,7 @@ async function setupPresence() {
   await registerPresence(state.roomCode, state.localUserId, {
     name: state.userName || "Guest",
     line: 1,
-    mode: state.currentVariant,
+    mode: "editing",
     isEditing: false
   });
 
@@ -638,10 +605,12 @@ async function setupPresence() {
 async function updatePresenceNow(isEditing) {
   console.log(`Updating presence. Index: ${state.activeIndex}, Is Editing: ${isEditing}`);
   const line = state.activeIndex >= 0 ? state.activeIndex + 1 : 1;
+  const activeBlock = state.blocks[state.activeIndex];
+  const mode = activeBlock?.type === "dialogue" ? "dialogue" : "paragraph";
   await updatePresence(state.roomCode, state.localUserId, {
     name: state.userName || "Guest",
     line,
-    mode: state.currentVariant,
+    mode,
     isEditing
   });
 }
@@ -718,7 +687,7 @@ function applyPresenceHighlightsToDom() {
 
     const textNode = node.querySelector(".block-text");
     if (textNode instanceof HTMLElement) {
-      const canEdit = index === state.activeIndex && !lockedByOther;
+      const canEdit = !lockedByOther;
       textNode.contentEditable = String(canEdit);
       if (!canEdit && document.activeElement === textNode) {
         console.log(`Blurring inactive/locked block-text at index ${index}.`);
@@ -729,9 +698,6 @@ function applyPresenceHighlightsToDom() {
     if (lockedByOther && index === state.activeIndex) {
       console.log(`Current user was active on block ${index}, which is now locked. Ejecting selection.`);
       state.activeIndex = -1;
-      state.currentVariant = "normal";
-      setModeButtons();
-      updateModeRowVisibility();
       node.classList.remove("active");
     }
   });
@@ -755,12 +721,10 @@ function parseRawScript(rawText, characters) {
 
     if (dialogueMatch) {
       const body = lines.slice(1).join("\n").trim();
-      const parsed = parseVariantText(body);
       return {
         type: "dialogue",
         character: dialogueMatch[1].trim(),
-        text: parsed.text,
-        variant: parsed.variant
+        text: body
       };
     }
 
@@ -768,18 +732,15 @@ function parseRawScript(rawText, characters) {
       return {
         type: "action",
         character: "",
-        text: chunk.slice(1, -1).trim(),
-        variant: "description"
+        text: chunk.slice(1, -1).trim()
       };
     }
 
-    const parsed = parseVariantText(chunk);
     const type = characters.includes(first.trim()) ? "dialogue" : "paragraph";
     return {
       type,
       character: type === "dialogue" ? first.trim() : "",
-      text: parsed.text,
-      variant: parsed.variant
+      text: chunk
     };
   });
 }
@@ -801,40 +762,6 @@ function serializeBlocks(blocks) {
     })
     .filter(Boolean)
     .join("\n\n");
-}
-
-function parseVariantText(text) {
-  const trimmed = text.trim();
-  if (trimmed.startsWith("(") && trimmed.endsWith(")") && trimmed.length > 1) {
-    return {
-      variant: "description",
-      text: trimmed.slice(1, -1).trim()
-    };
-  }
-
-  return {
-    variant: "normal",
-    text: text
-  };
-}
-
-function placeCaretBeforeClosingParenthesis(element) {
-  console.log("Placing caret inside the parentheses for technical description.");
-  const text = element.textContent || "";
-  const closingIndex = text.lastIndexOf(")");
-  const caretIndex = closingIndex > 0 ? closingIndex : text.length;
-  const range = document.createRange();
-  const targetNode = element.firstChild || element;
-  const safeIndex = Math.min(caretIndex, targetNode.textContent?.length || 0);
-  range.setStart(targetNode, safeIndex);
-  range.collapse(true);
-
-  const selection = window.getSelection();
-  if (!selection) {
-    return;
-  }
-  selection.removeAllRanges();
-  selection.addRange(range);
 }
 
 function setKeyboardOpen(isOpen) {
@@ -867,17 +794,34 @@ function adjustViewportLayout() {
   document.documentElement.style.setProperty("--keyboard-offset", `${keyboardOffset}px`);
 }
 
-function updateModeRowVisibility() {
-  const activeBlock = state.blocks[state.activeIndex];
-  const shouldHide = activeBlock?.type === "paragraph" || !activeBlock;
-  console.log(`Setting variant switcher visibility: Hidden = ${shouldHide}`);
-  modeRow.classList.toggle("hidden", shouldHide);
+adjustViewportLayout();
+
+function showPanelNotice(message) {
+  if (!panelNotice) {
+    return;
+  }
+
+  panelNotice.textContent = message;
+  panelNotice.classList.remove("hidden");
+  clearTimeout(showPanelNotice.timer);
+  showPanelNotice.timer = setTimeout(() => {
+    panelNotice.classList.add("hidden");
+  }, 1300);
 }
 
-adjustViewportLayout();
+function syncActiveBlockStyles() {
+  const nodes = scriptCanvas.querySelectorAll(".block");
+  nodes.forEach((node, index) => {
+    node.classList.toggle("active", index === state.activeIndex);
+  });
+}
 
 function moveCaretToEnd(element) {
   console.log("Moving caret to the end of the text element.");
+  if (!element.isConnected) {
+    return;
+  }
+
   const range = document.createRange();
   range.selectNodeContents(element);
   range.collapse(false);

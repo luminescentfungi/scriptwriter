@@ -18,17 +18,25 @@ const ROOMS_ROOT = "salas";
 const COUNTER_PATH = `${ROOMS_ROOT}/_meta/lastRoomId`;
 
 function sanitizeCharacters(charactersRaw) {
-  return charactersRaw
+  if (Array.isArray(charactersRaw)) {
+    // New format: array of { name, description }
+    // We want to keep the full object to save descriptions too
+    return charactersRaw.filter(c => c && c.name);
+  }
+  // Old format: comma-separated string
+  return String(charactersRaw || "")
     .split(",")
-    .map((item) => item.trim())
+    .map(s => s.trim())
     .filter(Boolean)
-    .slice(0, 12);
+    .map(name => ({ name, description: "" }));
 }
 
 function buildInitialScript(metadata) {
   const title = metadata.title || "Untitled";
   const argument = metadata.argument || "";
-  const characters = metadata.characters.length ? metadata.characters.join(", ") : "No characters";
+  const characters = Array.isArray(metadata.characters) 
+    ? metadata.characters.map(c => c.name).join(", ") 
+    : "No characters";
 
   return [
     title.toUpperCase(),

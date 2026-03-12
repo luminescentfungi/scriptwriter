@@ -79,7 +79,7 @@ select {
   max-width: 860px;
   margin: 0.65rem auto 0;
   padding: 0 0.55rem;
-  height: calc(100vh - 60px - 136px - var(--keyboard-offset));
+  height: calc(100vh - 60px - 108px - var(--keyboard-offset));
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 0.65rem;
@@ -229,6 +229,13 @@ select {
   padding: 0.34rem 0.58rem;
 }
 
+.panel-notice {
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--muted);
+  min-height: 1rem;
+}
+
 .presence-inline {
   display: flex;
   gap: 0.4rem;
@@ -280,7 +287,7 @@ select {
   }
 
   .editor-shell {
-    height: calc(100vh - 56px - 112px - var(--keyboard-offset));
+    height: calc(100vh - 56px - 90px - var(--keyboard-offset));
     margin-top: 0.45rem;
   }
 

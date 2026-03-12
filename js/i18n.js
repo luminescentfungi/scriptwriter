@@ -14,7 +14,7 @@ const translations = {
     wizardDescription: "Complete the details and generate a 4-digit room code automatically.",
     scriptTitle: "Script title",
     scriptArgument: "Plot / argument",
-    scriptCharacters: "Characters (comma separated)",
+    scriptCharacters: "Characters:",
     scriptSetting: "Setting",
     scriptGenre: "Genre",
     back: "Back",
@@ -50,6 +50,9 @@ const translations = {
     noCharacters: "No characters defined",
     userEditingAt: "editing line",
     you: "you",
+    addCharacter: "+ Add character",
+    exportPdf: "Export to PDF",
+    exportDocx: "Export to DOCX",
     tapToEditMetadata: "Tap here to edit title, characters, and argument"
   },
   es: {
@@ -67,7 +70,7 @@ const translations = {
     wizardDescription: "Completa los detalles y genera automáticamente un código de 4 dígitos.",
     scriptTitle: "Título del guion",
     scriptArgument: "Argumento",
-    scriptCharacters: "Personajes (separados por comas)",
+    scriptCharacters: "Personajes:",
     scriptSetting: "Ambientación",
     scriptGenre: "Género",
     back: "Volver",
@@ -103,6 +106,9 @@ const translations = {
     noCharacters: "No hay personajes definidos",
     userEditingAt: "editando línea",
     you: "tú",
+    addCharacter: "+ Agregar personaje",
+    exportPdf: "Exportar a PDF",
+    exportDocx: "Exportar a DOCX",
     tapToEditMetadata: "Toca aquí para editar título, personajes y argumento"
   }
 };

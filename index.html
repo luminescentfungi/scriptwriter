@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Collaborative Theatre Writer</title>
   <link rel="stylesheet" href="./styles/main.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
 <body>
   <header class="app-header warm">
@@ -59,10 +62,11 @@
           <span data-i18n="scriptArgument">Plot / argument</span>
           <textarea id="scriptArgument" rows="3" maxlength="600" required></textarea>
         </label>
-        <label>
-          <span data-i18n="scriptCharacters">Characters (comma separated)</span>
-          <textarea id="scriptCharacters" rows="2" maxlength="300" required></textarea>
-        </label>
+        <div class="character-list-label-row">
+          <span data-i18n="scriptCharacters">Characters</span>
+          <button type="button" id="addCharacterBtn" class="secondary" style="margin-left:8px;"><span data-i18n="addCharacter">+ Add character</span></button>
+        </div>
+        <div id="characterList" class="character-list"></div>
         <label>
           <span data-i18n="scriptSetting">Setting</span>
           <input type="text" id="scriptSetting" maxlength="80">
@@ -75,6 +79,8 @@
         <div class="wizard-actions">
           <button type="button" id="backHome" class="secondary" data-i18n="back">Back</button>
           <button type="button" id="backToEditor" class="secondary hidden" data-i18n="backToEditor">Back to editor</button>
+          <button type="button" id="exportPdf" class="secondary hidden" data-i18n="exportPdf">Export PDF</button>
+          <button type="button" id="exportDocx" class="secondary hidden" data-i18n="exportDocx">Export DOCX</button>
           <button type="submit" class="primary" id="wizardSubmit" data-i18n="generateRoom">Generate room</button>
         </div>
       </form>
