@@ -1,13 +1,17 @@
 :root {
-  color-scheme: light;
-  --bg: #fff7ef;
-  --surface: #fffdf9;
-  --text: #3f2f28;
-  --muted: #8d7466;
-  --border: #efcfb8;
+  color-scheme: dark;
+  --bg: #2b1d16;
+  --surface: #3d2b21;
+  --text: #ffffff;
+  --text-dim: #ccbeb5;
+  --muted: #000000;
+  --border: #4d382d;
   --primary: #d97757;
   --primary-soft: #fce5d6;
   --keyboard-offset: 0px;
+  --input-bg: #8d7466;
+  --white-bg: #fff4ec;
+  --salmon: #fa8072;
 }
 
 * {
@@ -20,7 +24,7 @@ body {
   height: 100%;
   font-family: Inter, system-ui, -apple-system, sans-serif;
   color: var(--text);
-  background: linear-gradient(180deg, #fff9f4 0%, var(--bg) 100%);
+  background: var(--bg);
   overflow: hidden;
 }
 
@@ -39,13 +43,14 @@ select {
   align-items: center;
   padding: 0.55rem 0.75rem;
   border-bottom: 1px solid var(--border);
-  background: rgba(255, 251, 246, 0.95);
+  background: var(--surface);
   backdrop-filter: blur(8px);
 }
 
 .editor-room {
   text-align: center;
   font-weight: 700;
+  color: var(--text);
 }
 
 .editor-actions {
@@ -57,14 +62,14 @@ select {
 
 .editor-actions label {
   font-size: 0.88rem;
-  color: var(--muted);
+  color: var(--text-dim);
 }
 
 .ghost,
 .secondary {
   border: 1px solid var(--border);
-  background: #fff;
-  color: var(--text);
+  background: var(--input-bg);
+  color: #000;
   border-radius: 10px;
   padding: 0.45rem 0.7rem;
 }
@@ -103,29 +108,33 @@ select {
 .meta-card h1 {
   margin: 0 0 0.3rem;
   font-size: 1.35rem;
+  color: var(--text);
 }
 
 .meta-card p {
   margin: 0.2rem 0;
-  color: var(--muted);
+  color: var(--text-dim);
 }
 
 .meta-hint {
-  color: var(--primary);
+  color: var(--text-dim);
   font-size: 0.86rem;
 }
 
 .meta-presence {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
   margin-top: 0.35rem;
   padding-top: 0.4rem;
   border-top: 1px dashed var(--border);
 }
 
 .meta-presence .presence-label {
-  display: block;
   font-size: 0.82rem;
-  color: var(--muted);
-  margin-bottom: 0.28rem;
+  color: var(--text-dim);
+  white-space: nowrap;
 }
 
 .script-viewport {
@@ -147,11 +156,13 @@ select {
   border: 1px solid transparent;
   padding: 0.4rem 0.5rem;
   text-align: center;
+  color: #000000;
+  background: var(--input-bg);
 }
 
 .block.active {
   border-color: var(--primary);
-  background: #fff7f1;
+  background: #a68c7e;
 }
 
 .block.presence-highlight {
@@ -160,7 +171,7 @@ select {
 
 .block.locked {
   cursor: not-allowed;
-  background: #fffaf6;
+  opacity: 0.7;
 }
 
 .block.locked .block-text {
@@ -171,6 +182,11 @@ select {
   outline: none;
   min-height: 1.4rem;
   white-space: pre-wrap;
+  -webkit-touch-callout: none;
+}
+
+.script-canvas {
+  -webkit-touch-callout: none;
 }
 
 .dialogue-character {
@@ -188,11 +204,10 @@ select {
 .block.action .block-text,
 .block.description .block-text {
   font-style: italic;
-  color: #5a4940;
 }
 
 .blank-target {
-  border: 1px dashed #e9c8b4;
+  border: 1px dashed var(--border);
   border-radius: 10px;
   min-height: 2rem;
 }
@@ -204,7 +219,7 @@ select {
   bottom: 0;
   z-index: 22;
   border-top: 1px solid var(--border);
-  background: rgba(255, 249, 241, 0.98);
+  background: var(--surface);
   padding: 0.5rem 0.65rem calc(0.5rem + env(safe-area-inset-bottom));
   display: grid;
   gap: 0.42rem;
@@ -222,9 +237,9 @@ select {
 }
 
 .characters button {
-  border: 1px solid #f0bda0;
-  background: var(--primary-soft);
-  color: #633d2e;
+  border: none;
+  background: var(--salmon);
+  color: #000;
   border-radius: 999px;
   padding: 0.34rem 0.58rem;
 }
@@ -232,18 +247,19 @@ select {
 .panel-notice {
   text-align: center;
   font-size: 0.78rem;
-  color: var(--muted);
+  color: var(--text-dim);
   min-height: 1rem;
 }
 
 .presence-inline {
   display: flex;
   gap: 0.4rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .presence-inline span {
-  background: #fff;
+  background: var(--white-bg);
+  color: #000;
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.13rem 0.45rem;
@@ -261,19 +277,20 @@ select {
   border-radius: 12px;
   box-shadow: 0 10px 24px rgba(79, 42, 26, 0.18);
   padding: 0.35rem;
+  user-select: none;
 }
 
 .context-menu button {
   text-align: left;
   border: 1px solid transparent;
   border-radius: 8px;
-  background: transparent;
+  background: #000dff;
   color: var(--text);
   padding: 0.42rem 0.5rem;
 }
 
 .context-menu button:hover {
-  background: #fff4ec;
+  background: #000dff;
   border-color: var(--border);
 }
 

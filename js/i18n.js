@@ -20,8 +20,8 @@ const translations = {
     back: "Back",
     backToEditor: "Back to editor",
     generateRoom: "Generate room",
-    saveMetadata: "Save metadata",
-    editRoomWizardTitle: "Edit room metadata",
+    saveMetadata: "Save new data",
+    editRoomWizardTitle: "Edit scripts details",
     editRoomWizardDescription: "Update title, argument, characters, and context for this room.",
     onlineUsers: "Online users",
     quickTools: "Quick tools",
@@ -51,9 +51,21 @@ const translations = {
     userEditingAt: "editing line",
     you: "you",
     addCharacter: "+ Add character",
+    editCharacter: "Edit character",
+    characterName: "Character name",
+    characterDescription: "Overall description",
+    save: "Save",
+    cancel: "Cancel",
     exportPdf: "Export to PDF",
     exportDocx: "Export to DOCX",
-    tapToEditMetadata: "Tap here to edit title, characters, and argument"
+    tapToEditMetadata: "Tap here to edit title, characters, and argument",
+    seeNotes: "See Notes",
+    seePreview: "See Preview",
+    close: "Close",
+    scriptNotes: "Script Notes",
+    notesPlaceholder: "Write your internal notes here...",
+    metadataLocked: "is editing right now",
+    metadataLockedBy: "The script metadata is currently locked by"
   },
   es: {
     appName: "Escritura de Guión Colaborativa",
@@ -76,8 +88,8 @@ const translations = {
     back: "Volver",
     backToEditor: "Volver al editor",
     generateRoom: "Generar sala",
-    saveMetadata: "Guardar metadata",
-    editRoomWizardTitle: "Editar metadata de la sala",
+    saveMetadata: "Guardar datos",
+    editRoomWizardTitle: "Editar datos de la obra",
     editRoomWizardDescription: "Actualiza título, argumento, personajes y contexto de esta sala.",
     onlineUsers: "Usuarios conectados",
     quickTools: "Herramientas rápidas",
@@ -96,20 +108,13 @@ const translations = {
     contextAddAfter: "Agregar párrafo después",
     scriptEditor: "Editor de guion",
     formattedPreview: "Vista previa formateada",
-    roomLabel: "Sala",
-    missingName: "Introduce tu nombre.",
-    invalidRoom: "Introduce un código de sala válido de 4 dígitos.",
-    roomNotFound: "No se encontró la sala.",
-    createFailed: "No se pudo crear la sala. Inténtalo de nuevo.",
-    maxRoomsReached: "No hay más códigos de 4 dígitos disponibles.",
-    untitled: "Sin título",
-    noCharacters: "No hay personajes definidos",
-    userEditingAt: "editando línea",
-    you: "tú",
-    addCharacter: "+ Agregar personaje",
-    exportPdf: "Exportar a PDF",
-    exportDocx: "Exportar a DOCX",
-    tapToEditMetadata: "Toca aquí para editar título, personajes y argumento"
+    seePreview: "Ver Vista Previa",
+    close: "Cerrar",
+    seeNotes: "Ver Notas",
+    scriptNotes: "Notas del Guion",
+    notesPlaceholder: "Escribe tus notas internas aquí...",
+    metadataLocked: "está editando ahora",
+    metadataLockedBy: "La información de la obra está siendo editada por"
   }
 };
 
@@ -124,5 +129,11 @@ export function applyStaticTranslations(language) {
   nodes.forEach((node) => {
     const key = node.getAttribute("data-i18n");
     node.textContent = getText(language, key);
+  });
+
+  const placeholders = document.querySelectorAll("[data-i18n-placeholder]");
+  placeholders.forEach((node) => {
+    const key = node.getAttribute("data-i18n-placeholder");
+    node.placeholder = getText(language, key);
   });
 }

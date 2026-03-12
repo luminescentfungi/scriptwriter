@@ -1,4 +1,11 @@
-import { createRoom, getRoom, updateRoomMetadata } from "./firebase.js";
+import { 
+  createRoom, 
+  getRoom, 
+  updateRoomMetadata,
+  subscribeToMetadataLock,
+  tryAcquireMetadataLock,
+  releaseMetadataLock
+} from "./firebase.js";
 import {
   getStoredLanguage,
   setStoredLanguage,
@@ -19,76 +26,122 @@ const backToEditorButton = document.getElementById("backToEditor");
 const wizardSubmit = document.getElementById("wizardSubmit");
 const wizardHeading = document.getElementById("wizardHeading");
 const wizardSubtitle = document.getElementById("wizardSubtitle");
+const wizardHeaderActions = document.getElementById("wizardHeaderActions");
 const joinForm = document.getElementById("joinForm");
 const wizardForm = document.getElementById("wizardForm");
 const exportPdfButton = document.getElementById("exportPdf");
 const exportDocxButton = document.getElementById("exportDocx");
-document.getElementById("addCharacterBtn").addEventListener("click", addCharacter);
+const seeNotesButton = document.getElementById("seeNotesBtn");
+const seePreviewButton = document.getElementById("seePreviewBtn");
+const notesModal = document.getElementById("notesModal");
+const previewModal = document.getElementById("previewModal");
+const previewCanvas = document.getElementById("previewCanvas");
+const closePreviewButton = document.getElementById("closePreview");
+const scriptNotesInput = document.getElementById("scriptNotesInput");
+const saveNotesButton = document.getElementById("saveNotes");
+const cancelNotesButton = document.getElementById("cancelNotes");
+const metadataLockInfo = document.getElementById("metadataLockInfo");
+
+const characterModal = document.getElementById("characterModal");
+const characterForm = document.getElementById("characterForm");
+const modalCharName = document.getElementById("modalCharName");
+const modalCharDesc = document.getElementById("modalCharDesc");
+const cancelCharButton = document.getElementById("cancelChar");
+
+document.getElementById("addCharacterBtn").addEventListener("click", () => openCharacterModal());
 
 const state = {
   language: getStoredLanguage(),
   userName: getStoredUserName(),
   roomCode: getStoredRoomCode(),
   editRoomCode: "",
-  characters: []
+  characters: [],
+  editingCharIndex: -1,
+  metadataLock: null
 };
 
-function addCharacter() {
-  state.characters.push({ name: "", description: "" });
-  renderCharacterList();
+let lockSubscription = null;
+
+function openCharacterModal(index = -1) {
+  if (state.editRoomCode && state.metadataLock && state.metadataLock.holder !== state.userName) {
+    return;
+  }
+  state.editingCharIndex = index;
+  if (index >= 0) {
+    const char = state.characters[index];
+    modalCharName.value = char.name || "";
+    modalCharDesc.value = char.description || "";
+  } else {
+    modalCharName.value = "";
+    modalCharDesc.value = "";
+  }
+  characterModal.classList.remove("hidden");
+  modalCharName.focus();
 }
 
+function closeCharacterModal() {
+  characterModal.classList.add("hidden");
+  state.editingCharIndex = -1;
+}
+
+characterForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (state.editRoomCode && state.metadataLock && state.metadataLock.holder !== state.userName) {
+    return;
+  }
+  const name = modalCharName.value.trim();
+  const description = modalCharDesc.value.trim();
+  
+  if (!name) return;
+
+  if (state.editingCharIndex >= 0) {
+    state.characters[state.editingCharIndex] = { name, description };
+  } else {
+    state.characters.push({ name, description });
+  }
+  
+  closeCharacterModal();
+  renderCharacterList();
+});
+
+cancelCharButton.addEventListener("click", closeCharacterModal);
+
 function renderCharacterList() {
+  const isLockedByOther = state.editRoomCode && state.metadataLock && state.metadataLock.holder !== state.userName;
+
   const list = document.getElementById("characterList");
   list.innerHTML = "";
   state.characters.forEach((char, idx) => {
     const wrapper = document.createElement("div");
-    wrapper.className = "character-row";
-    wrapper.style.display = "flex";
-    wrapper.style.alignItems = "flex-start";
-    wrapper.style.marginBottom = "10px";
+    wrapper.className = "char-btn-wrapper";
 
-    const nameInput = document.createElement("input");
-    nameInput.type = "text";
-    nameInput.placeholder = "Character name";
-    nameInput.value = char.name;
-    nameInput.style.marginRight = "8px";
-    nameInput.style.flex = "1";
-    nameInput.addEventListener("input", e => {
-      state.characters[idx].name = e.target.value;
-    });
-
-    const descInput = document.createElement("input");
-    descInput.type = "text";
-    descInput.placeholder = "Description";
-    descInput.value = char.description;
-    descInput.style.marginTop = "4px";
-    descInput.style.flex = "2";
-    descInput.addEventListener("input", e => {
-      state.characters[idx].description = e.target.value;
-    });
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "secondary char-edit-btn";
+    editBtn.textContent = char.name || "Untitled";
+    editBtn.title = char.description || "";
+    editBtn.disabled = isLockedByOther;
+    editBtn.addEventListener("click", () => openCharacterModal(idx));
 
     const delBtn = document.createElement("button");
     delBtn.type = "button";
-    delBtn.textContent = "-";
-    delBtn.className = "secondary";
-    delBtn.style.marginLeft = "8px";
-    delBtn.addEventListener("click", () => {
+    delBtn.className = "secondary char-del-btn";
+    delBtn.textContent = "✕";
+    delBtn.disabled = isLockedByOther;
+    delBtn.addEventListener("click", (e) => {
+      if (isLockedByOther) return;
+      e.stopPropagation();
       state.characters.splice(idx, 1);
       renderCharacterList();
     });
 
-    const col = document.createElement("div");
-    col.style.display = "flex";
-    col.style.flexDirection = "column";
-    col.style.flex = "1";
-    col.appendChild(nameInput);
-    col.appendChild(descInput);
-
-    wrapper.appendChild(col);
+    wrapper.appendChild(editBtn);
     wrapper.appendChild(delBtn);
     list.appendChild(wrapper);
   });
+  
+  const addBtn = document.getElementById("addCharacterBtn");
+  if (addBtn) addBtn.disabled = isLockedByOther;
 }
 
 function buildEditorUrl(roomCode) {
@@ -112,6 +165,7 @@ function bindEvents() {
     state.language = languageSelect.value;
     setStoredLanguage(state.language);
     applyStaticTranslations(state.language);
+    updateLockUI();
   });
 
   goWizardButton.addEventListener("click", () => {
@@ -119,23 +173,89 @@ function bindEvents() {
     updateUrl("wizard", "");
   });
 
-  backHomeButton.addEventListener("click", () => {
+  seeNotesButton.addEventListener("click", () => {
+    state.tempNotes = scriptNotesInput.value;
+    notesModal.classList.remove("hidden");
+    const isLockedByOther = state.editRoomCode && state.metadataLock && state.metadataLock.holder !== state.userName;
+    saveNotesButton.disabled = isLockedByOther;
+    scriptNotesInput.disabled = isLockedByOther;
+  });
+
+  saveNotesButton.addEventListener("click", () => {
+    if (state.editRoomCode && state.metadataLock && state.metadataLock.holder !== state.userName) {
+      return;
+    }
+    notesModal.classList.add("hidden");
+    if (state.editRoomCode) {
+      updateRoomMetadata(state.editRoomCode, { notes: scriptNotesInput.value });
+    }
+  });
+
+  cancelNotesButton.addEventListener("click", () => {
+    scriptNotesInput.value = state.tempNotes || "";
+    notesModal.classList.add("hidden");
+  });
+
+  backHomeButton.addEventListener("click", async () => {
+    if (state.editRoomCode && state.metadataLock && state.metadataLock.holder === state.userName) {
+      await releaseMetadataLock(state.editRoomCode, state.userName);
+    }
     showHome();
     updateUrl("home", "");
   });
 
-  backToEditorButton.addEventListener("click", () => {
+  backToEditorButton.addEventListener("click", async () => {
     if (!state.editRoomCode) {
       return;
+    }
+    if (state.metadataLock && state.metadataLock.holder === state.userName) {
+      await releaseMetadataLock(state.editRoomCode, state.userName);
     }
     window.location.href = buildEditorUrl(state.editRoomCode);
   });
 
   exportPdfButton.addEventListener("click", handleExportPdf);
+  seePreviewButton.addEventListener("click", handleSeePreview);
+  closePreviewButton.addEventListener("click", () => previewModal.classList.add("hidden"));
   exportDocxButton.addEventListener("click", handleExportDocx);
 
   joinForm.addEventListener("submit", handleJoin);
   wizardForm.addEventListener("submit", handleWizardSubmit);
+}
+
+function updateLockUI() {
+  if (!state.editRoomCode) {
+    metadataLockInfo.classList.add("hidden");
+    toggleWizardFields(false);
+    return;
+  }
+
+  if (state.metadataLock && state.metadataLock.holder) {
+    if (state.metadataLock.holder === state.userName) {
+      metadataLockInfo.classList.add("hidden");
+      toggleWizardFields(false);
+    } else {
+      metadataLockInfo.textContent = `${getText(state.language, "metadataLockedBy")} ${state.metadataLock.holder}`;
+      metadataLockInfo.classList.remove("hidden");
+      toggleWizardFields(true);
+    }
+  } else {
+    // No one has it, try to take it
+    tryAcquireMetadataLock(state.editRoomCode, state.userName);
+    metadataLockInfo.classList.add("hidden");
+    toggleWizardFields(false);
+  }
+}
+
+function toggleWizardFields(disabled) {
+  const inputs = wizardForm.querySelectorAll("input, textarea");
+  inputs.forEach(input => {
+    if (input.id !== "wizardName") { // Keep user name editable if needed, though usually fixed in edit
+      input.disabled = disabled;
+    }
+  });
+  wizardSubmit.disabled = disabled;
+  renderCharacterList();
 }
 
 function hydrateDefaults() {
@@ -170,12 +290,18 @@ async function loadWizardForEdit(roomCode) {
   }
 
   state.editRoomCode = roomCode;
+  
+  if (lockSubscription) lockSubscription();
+  lockSubscription = subscribeToMetadataLock(roomCode, (lock) => {
+    state.metadataLock = lock;
+    updateLockUI();
+  });
+  
   wizardHeading.setAttribute("data-i18n", "editRoomWizardTitle");
   wizardSubtitle.setAttribute("data-i18n", "editRoomWizardDescription");
   wizardSubmit.setAttribute("data-i18n", "saveMetadata");
   backToEditorButton.classList.remove("hidden");
-  exportDocxButton.classList.remove("hidden");
-  exportPdfButton.classList.remove("hidden");
+  wizardHeaderActions.classList.remove("hidden");
   applyStaticTranslations(state.language);
 
   const metadata = room.metadata || {};
@@ -184,6 +310,7 @@ async function loadWizardForEdit(roomCode) {
   document.getElementById("scriptArgument").value = metadata.argument || "";
   document.getElementById("scriptSetting").value = metadata.setting || "";
   document.getElementById("scriptGenre").value = metadata.genre || "";
+  scriptNotesInput.value = metadata.notes || "";
 
   // Load characters as array of objects
   if (Array.isArray(metadata.characters)) {
@@ -208,13 +335,24 @@ function showWizard() {
 }
 
 function resetWizardMetaMode() {
+  if (state.editRoomCode && state.metadataLock && state.metadataLock.holder === state.userName) {
+    releaseMetadataLock(state.editRoomCode, state.userName);
+  }
+  if (lockSubscription) {
+    lockSubscription();
+    lockSubscription = null;
+  }
   state.editRoomCode = "";
+  state.metadataLock = null;
+  metadataLockInfo.classList.add("hidden");
+  toggleWizardFields(false);
+
   wizardHeading.setAttribute("data-i18n", "wizardTitle");
   wizardSubtitle.setAttribute("data-i18n", "wizardDescription");
   wizardSubmit.setAttribute("data-i18n", "generateRoom");
   backToEditorButton.classList.add("hidden");
-  exportDocxButton.classList.add("hidden");
-  exportPdfButton.classList.add("hidden");
+  wizardHeaderActions.classList.add("hidden");
+  scriptNotesInput.value = "";
   applyStaticTranslations(state.language);
 }
 
@@ -249,6 +387,10 @@ async function handleJoin(event) {
 
 async function handleWizardSubmit(event) {
   event.preventDefault();
+  
+  if (state.editRoomCode && state.metadataLock && state.metadataLock.holder !== state.userName) {
+    return;
+  }
 
   const name = document.getElementById("wizardName").value.trim();
   if (!name) {
@@ -261,7 +403,8 @@ async function handleWizardSubmit(event) {
     argument: document.getElementById("scriptArgument").value,
     characters: state.characters.filter(c => c.name.trim()), // Only save characters with names
     setting: document.getElementById("scriptSetting").value,
-    genre: document.getElementById("scriptGenre").value
+    genre: document.getElementById("scriptGenre").value,
+    notes: scriptNotesInput.value
   };
 
   state.userName = name;
@@ -270,6 +413,10 @@ async function handleWizardSubmit(event) {
   try {
     if (state.editRoomCode) {
       await updateRoomMetadata(state.editRoomCode, { ...payload, updatedBy: name });
+      // Release lock before leaving
+      if (state.metadataLock && state.metadataLock.holder === state.userName) {
+        await releaseMetadataLock(state.editRoomCode, state.userName);
+      }
       window.location.href = buildEditorUrl(state.editRoomCode);
       return;
     }
@@ -375,10 +522,11 @@ async function handleExportPdf() {
       if (isScene) {
         actionP.style.fontWeight = "bold";
         actionP.style.textTransform = "uppercase";
+        actionP.innerHTML = formatBlockHTML(blockText, "action");
+      } else {
+        // Regular action/description block
+        actionP.innerHTML = formatBlockHTML(blockText, "paragraph");
       }
-
-      actionP.innerHTML = formatParenthesisItalics(blockText);
-      blockDiv.appendChild(actionP);
     }
     scriptContent.appendChild(blockDiv);
   });
@@ -399,6 +547,80 @@ async function handleExportPdf() {
     document.body.removeChild(container);
   });
 }
+
+async function handleSeePreview() {
+  if (!state.editRoomCode) return;
+  const room = await getRoom(state.editRoomCode);
+  if (!room) return;
+
+  const metadata = room.metadata || {};
+  const scriptText = room.script?.rawText || "";
+  
+  previewCanvas.innerHTML = "";
+
+  // Title Page
+  const titleSection = document.createElement("div");
+  titleSection.className = "page-title-section";
+  
+  const title = document.createElement("h1");
+  title.textContent = (metadata.title || "Untitled").toUpperCase();
+  titleSection.appendChild(title);
+
+  const author = document.createElement("p");
+  author.className = "author";
+  author.textContent = `By\n${metadata.createdBy || "Anonymous"}`;
+  titleSection.appendChild(author);
+  
+  previewCanvas.appendChild(titleSection);
+
+  // Script Content
+  const blocks = scriptText.split(/\n\s*\n/).filter(Boolean);
+  
+  blocks.forEach(blockText => {
+    const blockDiv = document.createElement("div");
+    blockDiv.className = "preview-block";
+
+    const lines = blockText.trim().split("\n");
+    const firstLine = lines[0];
+
+    if (firstLine.includes(":") && firstLine.split(":")[0] === firstLine.split(":")[0].toUpperCase() && !firstLine.includes("SCENE")) {
+      // Dialogue Block
+      const separatorIndex = firstLine.indexOf(":");
+      const charName = firstLine.substring(0, separatorIndex).trim();
+      const dialogueText = firstLine.substring(separatorIndex + 1).trim();
+
+      const nameP = document.createElement("p");
+      nameP.className = "preview-char";
+      nameP.textContent = charName;
+      blockDiv.appendChild(nameP);
+
+      const speechP = document.createElement("p");
+      speechP.className = "preview-dialogue";
+      speechP.innerHTML = formatBlockHTML(dialogueText, "dialogue");
+      blockDiv.appendChild(speechP);
+    } else {
+      // Action or Scene Heading
+      const actionP = document.createElement("p");
+      
+      const isScene = firstLine.toUpperCase().startsWith("SCENE") || 
+                      firstLine.toUpperCase().startsWith("INT.") || 
+                      firstLine.toUpperCase().startsWith("EXT.");
+      
+      if (isScene) {
+        actionP.className = "preview-scene";
+        actionP.innerHTML = formatBlockHTML(blockText, "action");
+      } else {
+        actionP.className = "preview-action";
+        actionP.innerHTML = formatBlockHTML(blockText, "paragraph");
+      }
+      blockDiv.appendChild(actionP);
+    }
+    previewCanvas.appendChild(blockDiv);
+  });
+
+  previewModal.classList.remove("hidden");
+}
+
 async function handleExportDocx() {
   if (!state.editRoomCode) return;
   const room = await getRoom(state.editRoomCode);
@@ -458,7 +680,7 @@ async function handleExportDocx() {
 
       // Dialogue
       docChildren.push(new Paragraph({
-        children: parseTextForItalicsDocx(dialogueText, TextRun),
+        children: parseTextForItalicsDocx(dialogueText, TextRun, false, "dialogue"),
         indent: { left: 1440, right: 1440 }, // Approx margins for dialogue
         spacing: { after: 120 },
       }));
@@ -468,8 +690,9 @@ async function handleExportDocx() {
                       firstLine.toUpperCase().startsWith("INT.") || 
                       firstLine.toUpperCase().startsWith("EXT.");
       
+      const type = isScene ? "action" : "paragraph";
       docChildren.push(new Paragraph({
-        children: parseTextForItalicsDocx(blockText, TextRun, isScene),
+        children: parseTextForItalicsDocx(blockText, TextRun, isScene, type),
         spacing: { before: 240, after: 120 },
       }));
     }
@@ -487,8 +710,18 @@ async function handleExportDocx() {
   });
 }
 
-function parseTextForItalicsDocx(text, TextRun, isBold = false) {
+function parseTextForItalicsDocx(text, TextRun, isBold = false, type = "paragraph") {
   const parts = [];
+
+  if (type === "paragraph" || type === "action") {
+    parts.push(new TextRun({
+      text: text,
+      italics: true,
+      bold: isBold
+    }));
+    return parts;
+  }
+
   const regex = /\(([^)]*)\)/g;
   let lastIndex = 0;
   let match;
@@ -522,8 +755,11 @@ function parseTextForItalicsDocx(text, TextRun, isBold = false) {
 }
 
 
-function formatParenthesisItalics(text) {
+function formatBlockHTML(text, type) {
   if (!text) return "";
+  if (type === "paragraph" || type === "action") {
+    return `<i>${text}</i>`;
+  }
   return text.replace(/\(([^)]*)\)/g, (match) => `<i>${match}</i>`);
 }
 

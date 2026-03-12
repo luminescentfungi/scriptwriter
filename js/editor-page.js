@@ -1,4 +1,4 @@
-import {
+  import {
   getRoom,
   subscribeToRoom,
   updateScript,
@@ -274,17 +274,22 @@ function renderBlocks() {
     textNode.className = "block-text";
     textNode.contentEditable = String(!lockedByOther);
     textNode.spellcheck = true;
-    textNode.innerHTML = formatParenthesisItalics(block.text);
+    textNode.innerHTML = formatBlockHTML(block.text, block.type);
 
     textNode.addEventListener("input", () => {
       console.log(`Input event on block ${index}. Current text length: ${textNode.textContent?.length}`);
       if (isBlockLockedByOther(index)) {
         console.warn(`Block ${index} is locked by another user. Reverting local change.`);
-        textNode.innerHTML = formatParenthesisItalics(state.blocks[index].text || "");
+        textNode.innerHTML = formatBlockHTML(state.blocks[index].text || "", state.blocks[index].type);
         return;
       }
       // Get plain text from the editable div
-      const nextRaw = textNode.innerText || "";
+      let nextRaw = textNode.innerText || "";
+
+      // Auto-capitalize after a dot followed by space/newline and a parenthesis
+      // e.g. ". (l" -> ". (L" or ". )l" -> ". )L"
+      nextRaw = nextRaw.replace(/(\.\s*[\(\)]\s*)([a-z])/g, (match, p1, p2) => p1 + p2.toUpperCase());
+
       state.blocks[index].text = nextRaw;
       if (state.blocks[index].type === "paragraph" && nextRaw.trim()) {
         state.blocks[index].justCreated = false;
@@ -292,14 +297,25 @@ function renderBlocks() {
       state.typingLockUntil = Date.now() + 1000;
       scheduleSave();
       updatePresenceNow(true);
-      // Re-render italics formatting
-      textNode.innerHTML = formatParenthesisItalics(nextRaw);
-      // Restore caret position
-      moveCaretToEnd(textNode);
+
+      // Re-render italics formatting if needed
+      const currentHTML = textNode.innerHTML;
+      const expectedHTML = formatBlockHTML(nextRaw, state.blocks[index].type);
+      if (currentHTML !== expectedHTML) {
+        const offset = getCaretOffset(textNode);
+        textNode.innerHTML = expectedHTML;
+        // Restore caret position accurately instead of jumping to end
+        setCaretOffset(textNode, offset);
+      }
     });
-// Formats text so that anything between parentheses (including the parentheses) is wrapped in <i> tags.
-function formatParenthesisItalics(text) {
+
+// Formats text based on block type. Paragraphs are fully italicized.
+// Dialogue blocks only italicize portions within parentheses.
+function formatBlockHTML(text, type) {
   if (!text) return "";
+  if (type === "paragraph" || type === "action") {
+    return `<i>${text}</i>`;
+  }
   // Replace (content) with <i>(content)</i>, non-greedy for nested/adjacent
   return text.replace(/\(([^)]*)\)/g, (match) => `<i>${match}</i>`);
 }
@@ -353,6 +369,13 @@ function formatParenthesisItalics(text) {
         if (isBlockLockedByOther(index)) {
           return;
         }
+        // Inhibit selection and keyboard on mobile long-press
+        if (window.getSelection) {
+          window.getSelection().removeAllRanges();
+        }
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
         selectBlock(index, false);
         openContextMenu(index, event.clientX, event.clientY);
       }, 480);
@@ -401,19 +424,20 @@ function selectBlock(index, focusEditor) {
     return;
   }
 
+  const activeText = scriptCanvas.querySelector(`.block[data-index="${state.activeIndex}"] .block-text`);
+  if (!activeText) {
+    return;
+  }
+
   if (hasChanged) {
-    focusActiveTextAtEnd();
-  } else {
-    console.log("Same block re-selected, ensuring focus and caret position.");
-    const activeText = scriptCanvas.querySelector(`.block[data-index="${state.activeIndex}"] .block-text`);
-    if (!activeText) {
-      return;
-    }
-    const activeBlock = state.blocks[state.activeIndex];
-    activeText.textContent = activeBlock?.text || "";
-    activeText.contentEditable = String(!isBlockLockedByOther(state.activeIndex));
+    console.log("New block selected, focusing and moving caret to end.");
     activeText.focus();
     moveCaretToEnd(activeText);
+  } else {
+    console.log("Same block re-selected, ensuring focus but NOT moving caret.");
+    if (document.activeElement !== activeText) {
+      activeText.focus();
+    }
   }
 
   updatePresenceNow(false);
@@ -831,6 +855,51 @@ function moveCaretToEnd(element) {
   }
   selection.removeAllRanges();
   selection.addRange(range);
+}
+
+function getCaretOffset(element) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return 0;
+  const range = selection.getRangeAt(0);
+  const preCaretRange = range.cloneRange();
+  preCaretRange.selectNodeContents(element);
+  preCaretRange.setEnd(range.endContainer, range.endOffset);
+  return preCaretRange.toString().length;
+}
+
+function setCaretOffset(element, offset) {
+  const selection = window.getSelection();
+  if (!selection) return;
+  const range = document.createRange();
+  let currentOffset = 0;
+  let targetNode = null;
+  let targetOffset = 0;
+
+  function traverse(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const nextOffset = currentOffset + node.length;
+      if (offset >= currentOffset && offset <= nextOffset) {
+        targetNode = node;
+        targetOffset = offset - currentOffset;
+        return true;
+      }
+      currentOffset = nextOffset;
+    } else {
+      for (const child of node.childNodes) {
+        if (traverse(child)) return true;
+      }
+    }
+  }
+
+  traverse(element);
+  if (targetNode) {
+    range.setStart(targetNode, targetOffset);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  } else {
+    moveCaretToEnd(element);
+  }
 }
 
 function cleanupSubscriptions() {

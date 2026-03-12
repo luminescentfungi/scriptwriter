@@ -103,7 +103,7 @@ export async function getRoom(roomCode) {
   return snapshot.val();
 }
 
-export async function updateRoomMetadata(roomCode, { title, argument, characters, setting, genre, updatedBy }) {
+export async function updateRoomMetadata(roomCode, { title, argument, notes, characters, setting, genre, updatedBy }) {
   const metadataRef = ref(db, `${ROOMS_ROOT}/${roomCode}/metadata`);
   const cleanedCharacters = sanitizeCharacters(characters);
   await update(metadataRef, {
@@ -112,6 +112,7 @@ export async function updateRoomMetadata(roomCode, { title, argument, characters
     characters: cleanedCharacters,
     setting: setting.trim(),
     genre: genre.trim(),
+    notes: notes.trim(),
     updatedBy,
     updatedAt: serverTimestamp()
   });
@@ -137,6 +138,39 @@ export function subscribeToPresence(roomCode, callback) {
   const presenceRef = ref(db, `${ROOMS_ROOT}/${roomCode}/presence`);
   return onValue(presenceRef, (snapshot) => {
     callback(snapshot.val() ?? {});
+  });
+}
+
+export function subscribeToMetadataLock(roomCode, callback) {
+  const lockRef = ref(db, `${ROOMS_ROOT}/${roomCode}/metadataLock`);
+  return onValue(lockRef, (snapshot) => {
+    callback(snapshot.val());
+  });
+}
+
+export async function tryAcquireMetadataLock(roomCode, userName) {
+  const lockRef = ref(db, `${ROOMS_ROOT}/${roomCode}/metadataLock`);
+  await runTransaction(lockRef, (current) => {
+    if (current && current.holder && current.holder !== userName) {
+      return; // Do nothing, someone else has it
+    }
+    return {
+      holder: userName,
+      updatedAt: serverTimestamp()
+    };
+  });
+  
+  // Setup disconnect to clear lock if we are the holder
+  onDisconnect(lockRef).remove();
+}
+
+export async function releaseMetadataLock(roomCode, userName) {
+  const lockRef = ref(db, `${ROOMS_ROOT}/${roomCode}/metadataLock`);
+  await runTransaction(lockRef, (current) => {
+    if (current && current.holder === userName) {
+      return null;
+    }
+    return;
   });
 }
 
