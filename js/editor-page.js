@@ -221,24 +221,35 @@ function applyCharacterToSelection(character) {
   const activeBlock = state.blocks[state.activeIndex];
   console.log("Applying character", character, "to active block", activeBlock);
 
-  if (!activeBlock || activeBlock.type !== "paragraph") {
-    showPanelNotice("Crea un nuevo bloque en blanco para añadir un personaje.");
+  if (!activeBlock) {
+    showPanelNotice("Selecciona un bloque para añadir un personaje.");
     return;
   }
 
-  if (!activeBlock.justCreated) {
-    showPanelNotice("Crea un nuevo bloque en blanco para añadir un personaje.");
+  const upperChar = String(character).toUpperCase();
+
+  // If already a dialogue block
+  if (activeBlock.type === "dialogue") {
+    if (activeBlock.character === upperChar) {
+      // Toggle back to paragraph if same character clicked
+      console.log(`Active block ${state.activeIndex} same character clicked, reverting to paragraph`);
+      activeBlock.type = "paragraph";
+      activeBlock.character = "";
+    } else {
+      // Switch character if different character clicked
+      console.log(`Active block ${state.activeIndex} switching character to: ${upperChar}`);
+      activeBlock.character = upperChar;
+    }
+  } else if (activeBlock.type === "paragraph") {
+    // Convert paragraph to dialogue
+    console.log(`Active block ${state.activeIndex} converting to dialogue for character: ${upperChar}`);
+    activeBlock.type = "dialogue";
+    activeBlock.character = upperChar;
+  } else {
+    showPanelNotice("Crea un bloque de texto o diálogo para cambiar el personaje.");
     return;
   }
 
-  if ((activeBlock.text || "").trim()) {
-    showPanelNotice("Crea un nuevo bloque en blanco para añadir un personaje.");
-    return;
-  }
-
-  console.log(`Active block ${state.activeIndex} is empty paragraph, converting to dialogue`);
-  activeBlock.type = "dialogue";
-  activeBlock.character = String(character).toUpperCase();
   activeBlock.justCreated = false;
   state.typingLockUntil = Date.now() + 1000;
   scheduleSave();
@@ -488,8 +499,8 @@ function openContextMenu(index, x, y) {
 
   const actions = [
     { key: "contextDelete", action: () => { console.log(`Action: Delete block at ${index}`); deleteBlock(index); } },
-    { key: "contextAddBefore", action: () => { console.log(`Action: Insert paragraph before block ${index}`); insertBlock("paragraph", "", index); } },
-    { key: "contextAddAfter", action: () => { console.log(`Action: Insert paragraph after block ${index}`); insertBlock("paragraph", "", index + 1); } }
+    { key: "contextAddBefore", action: () => { console.log(`Action: Insert paragraph before block ${index}`); insertBlock("paragraph", "", index, { justCreated: true }); } },
+    { key: "contextAddAfter", action: () => { console.log(`Action: Insert paragraph after block ${index}`); insertBlock("paragraph", "", index + 1, { justCreated: true }); } }
   ];
 
   actions.forEach((item) => {
