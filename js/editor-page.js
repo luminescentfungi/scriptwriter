@@ -16,18 +16,13 @@ import {
 } from "./storage.js";
 import { applyStaticTranslations, getText, languageOptions } from "./i18n.js";
 
-const languageSelect = document.getElementById("languageSelect");
-const roomLabel = document.getElementById("roomLabel");
 const metaCard = document.getElementById("metaCard");
 const metaTitle = document.getElementById("metaTitle");
-const metaSubtitle = document.getElementById("metaSubtitle");
-const metaCharacters = document.getElementById("metaCharacters");
 const scriptCanvas = document.getElementById("scriptCanvas");
 const characterButtons = document.getElementById("characterButtons");
 const commandPanel = document.querySelector(".command-panel");
 const panelNotice = document.getElementById("panelNotice");
 const presenceInline = document.getElementById("presenceInline");
-const goHome = document.getElementById("goHome");
 const contextMenu = document.createElement("div");
 contextMenu.className = "context-menu hidden";
 document.body.appendChild(contextMenu);
@@ -85,7 +80,9 @@ async function init() {
     state.language = "en";
   }
 
-  languageSelect.value = state.language;
+  // Set document language and spellcheck for better dictionary matching
+  document.documentElement.lang = state.language;
+
   ensureUserNameBeforeStart();
 
   const roomCode = extractRoomCodeFromLocation() || getStoredRoomCode();
@@ -115,16 +112,12 @@ async function init() {
 }
 
 function bindEvents() {
-  languageSelect.addEventListener("change", () => {
-    state.language = languageSelect.value;
-    setStoredLanguage(state.language);
-    applyStaticTranslations(state.language);
-    hydrateRoomHeader();
-  });
-
-  goHome.addEventListener("click", () => {
-    window.location.href = "./index.html";
-  });
+  // languageSelect.addEventListener("change", () => {
+  //   state.language = languageSelect.value;
+  //   setStoredLanguage(state.language);
+  //   applyStaticTranslations(state.language);
+  //   hydrateRoomHeader();
+  // });
 
   metaCard.addEventListener("click", () => {
     if (state.keyboardOpen) {
@@ -189,10 +182,7 @@ function hydrateRoomHeader() {
     charsStr = metadata.characters.map(c => typeof c === "object" ? c.name : c).join(", ");
   }
 
-  roomLabel.textContent = `${getText(state.language, "roomLabel")} ${state.roomCode}`;
   metaTitle.textContent = metadata.title || getText(state.language, "untitled");
-  metaSubtitle.textContent = `${metadata.setting || "—"} • ${metadata.genre || "—"}`;
-  metaCharacters.textContent = charsStr;
 }
 
 function renderCharacterButtons() {

@@ -84,7 +84,7 @@ select {
   max-width: 860px;
   margin: 0.65rem auto 0;
   padding: 0 0.55rem;
-  height: calc(100vh - 60px - 108px - var(--keyboard-offset));
+  height: calc(106vh - 0.65rem - var(--keyboard-offset) - var(--panel-height, 108px));
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 0.65rem;
@@ -96,7 +96,7 @@ select {
   background: var(--surface);
   text-align: center;
   padding: 0.95rem;
-  margin-bottom: 0.7rem;
+  margin: 0 0 0.7rem;
   cursor: pointer;
 }
 
@@ -228,8 +228,22 @@ select {
 .row {
   display: flex;
   gap: 0.4rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
+  overflow: hidden;
+}
+
+.row.characters {
+  width: 100%;
+}
+
+.row.characters button {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: fit-content;
 }
 
 .row.compact button {
