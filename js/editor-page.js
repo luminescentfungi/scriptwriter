@@ -23,9 +23,6 @@ const characterButtons = document.getElementById("characterButtons");
 const commandPanel = document.querySelector(".command-panel");
 const panelNotice = document.getElementById("panelNotice");
 const presenceInline = document.getElementById("presenceInline");
-const contextMenu = document.createElement("div");
-contextMenu.className = "context-menu hidden";
-document.body.appendChild(contextMenu);
 const presencePalette = ["#e53935", "#2e7d32", "#1e88e5", "#fb8c00", "#d81b60"];
 
 const state = {
@@ -41,9 +38,8 @@ const state = {
   presenceUnsubscribe: null,
   localUserId: makeUserId(),
   lastRemoteRaw: "",
-  longPressTimer: null,
-  contextIndex: -1,
   keyboardOpen: false,
+  movingBlockIndex: -1,
   presenceByUserId: {}
 };
 
@@ -126,18 +122,7 @@ function bindEvents() {
     window.location.href = `./index.html?mode=wizard&room=${state.roomCode}`;
   });
 
-  document.addEventListener("click", (event) => {
-    if (!(event.target instanceof Element)) {
-      closeContextMenu();
-      return;
-    }
 
-    if (!event.target.closest(".context-menu")) {
-      closeContextMenu();
-    }
-  });
-
-  document.addEventListener("scroll", closeContextMenu, true);
 
   document.addEventListener("focusin", (event) => {
     if (!(event.target instanceof HTMLElement)) {
@@ -249,11 +234,37 @@ function applyCharacterToSelection(character) {
 }
 
 function renderBlocks() {
-  console.log("Rendering script blocks. Current block count:", state.blocks.length);
   scriptCanvas.innerHTML = "";
+  const isMoving = state.movingBlockIndex >= 0;
 
   state.blocks.forEach((block, index) => {
     const lockedByOther = isBlockLockedByOther(index);
+    const wrapper = document.createElement("div");
+    wrapper.className = "block-wrapper";
+    if (isMoving && index === state.movingBlockIndex) {
+      wrapper.classList.add("moving-source");
+    }
+
+    // Insert button at top of each block
+    const insertBtn = document.createElement("button");
+    insertBtn.type = "button";
+    if (isMoving) {
+      insertBtn.className = "block-insert-btn move-target";
+      insertBtn.textContent = "\u2192 \u25cb \u2190";
+      insertBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        moveBlockTo(index);
+      });
+    } else {
+      insertBtn.className = "block-insert-btn";
+      insertBtn.textContent = "+";
+      insertBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        insertBlock("paragraph", "", index, { justCreated: true });
+      });
+    }
+    wrapper.appendChild(insertBtn);
+
     const node = document.createElement("article");
     node.className = `block ${block.type}`;
     node.dataset.index = String(index);
@@ -264,6 +275,35 @@ function renderBlocks() {
       node.classList.add("locked");
     }
 
+    // Move button (left side)
+    const moveBtn = document.createElement("button");
+    moveBtn.type = "button";
+    moveBtn.className = "block-move-btn";
+    moveBtn.textContent = "\u21d5";
+    moveBtn.disabled = isMoving && index !== state.movingBlockIndex;
+    if (isMoving && index === state.movingBlockIndex) {
+      moveBtn.classList.add("active-move");
+    }
+    moveBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (isBlockLockedByOther(index)) return;
+      toggleMoveMode(index);
+    });
+    node.appendChild(moveBtn);
+
+    // Delete button (right side)
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "block-delete-btn";
+    delBtn.textContent = "\u2715";
+    delBtn.disabled = isMoving;
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (isBlockLockedByOther(index)) return;
+      deleteBlock(index);
+    });
+    node.appendChild(delBtn);
+
     if (block.type === "dialogue") {
       const cue = document.createElement("div");
       cue.className = "dialogue-character";
@@ -273,22 +313,16 @@ function renderBlocks() {
 
     const textNode = document.createElement("div");
     textNode.className = "block-text";
-    textNode.contentEditable = String(!lockedByOther);
+    textNode.contentEditable = String(!lockedByOther && !isMoving);
     textNode.spellcheck = true;
     textNode.innerHTML = formatBlockHTML(block.text, block.type);
 
     textNode.addEventListener("input", () => {
-      console.log(`Input event on block ${index}. Current text length: ${textNode.textContent?.length}`);
       if (isBlockLockedByOther(index)) {
-        console.warn(`Block ${index} is locked by another user. Reverting local change.`);
         textNode.innerHTML = formatBlockHTML(state.blocks[index].text || "", state.blocks[index].type);
         return;
       }
-      // Get plain text from the editable div
       let nextRaw = textNode.innerText || "";
-
-      // Auto-capitalize after a dot followed by space/newline and a parenthesis
-      // e.g. ". (l" -> ". (L" or ". )l" -> ". )L"
       nextRaw = nextRaw.replace(/(\.\s*[\(\)]\s*)([a-z])/g, (match, p1, p2) => p1 + p2.toUpperCase());
 
       state.blocks[index].text = nextRaw;
@@ -299,112 +333,93 @@ function renderBlocks() {
       scheduleSave();
       updatePresenceNow(true);
 
-      // Re-render italics formatting if needed
       const currentHTML = textNode.innerHTML;
       const expectedHTML = formatBlockHTML(nextRaw, state.blocks[index].type);
       if (currentHTML !== expectedHTML) {
         const offset = getCaretOffset(textNode);
         textNode.innerHTML = expectedHTML;
-        // Restore caret position accurately instead of jumping to end
         setCaretOffset(textNode, offset);
       }
     });
 
-// Formats text based on block type. Paragraphs are fully italicized.
-// Dialogue blocks only italicize portions within parentheses.
-function formatBlockHTML(text, type) {
-  if (!text) return "";
-  if (type === "paragraph" || type === "action") {
-    return `<i>${text}</i>`;
-  }
-  // Replace (content) with <i>(content)</i>, non-greedy for nested/adjacent
-  return text.replace(/\(([^)]*)\)/g, (match) => `<i>${match}</i>`);
-}
-
     node.appendChild(textNode);
+
     textNode.addEventListener("click", () => {
-      console.log(`Block text ${index} clicked.`);
-      if (isBlockLockedByOther(index)) {
-        return;
-      }
+      if (isBlockLockedByOther(index) || isMoving) return;
       selectBlock(index, false);
     });
 
     textNode.addEventListener("focus", () => {
-      console.log(`Block text ${index} focused.`);
-      if (isBlockLockedByOther(index)) {
-        return;
-      }
+      if (isBlockLockedByOther(index) || isMoving) return;
       selectBlock(index, false);
       updatePresenceNow(false);
     });
 
     node.addEventListener("click", () => {
-      console.log(`Block ${index} clicked.`);
-      if (isBlockLockedByOther(index)) {
-        console.log(`Block ${index} is locked. Interaction restricted.`);
-        return;
-      }
+      if (isBlockLockedByOther(index) || isMoving) return;
       selectBlock(index, true);
     });
 
-    node.addEventListener("contextmenu", (event) => {
-      console.log(`Context menu requested for block ${index}.`);
-      if (isBlockLockedByOther(index)) {
-        event.preventDefault();
-        closeContextMenu();
-        return;
-      }
-      event.preventDefault();
-      selectBlock(index, false);
-      openContextMenu(index, event.clientX, event.clientY);
-    });
-
-    node.addEventListener("pointerdown", (event) => {
-      if (isBlockLockedByOther(index)) {
-        return;
-      }
-      clearTimeout(state.longPressTimer);
-      state.longPressTimer = setTimeout(() => {
-        console.log(`Long press detected on block ${index}. Opening context menu.`);
-        if (isBlockLockedByOther(index)) {
-          return;
-        }
-        // Inhibit selection and keyboard on mobile long-press
-        if (window.getSelection) {
-          window.getSelection().removeAllRanges();
-        }
-        if (document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur();
-        }
-        selectBlock(index, false);
-        openContextMenu(index, event.clientX, event.clientY);
-      }, 480);
-    });
-
-    node.addEventListener("pointerup", () => {
-      clearTimeout(state.longPressTimer);
-    });
-
-    node.addEventListener("pointercancel", () => {
-      clearTimeout(state.longPressTimer);
-    });
-
-    node.addEventListener("pointerleave", () => {
-      clearTimeout(state.longPressTimer);
-    });
-
-    scriptCanvas.appendChild(node);
+    wrapper.appendChild(node);
+    scriptCanvas.appendChild(wrapper);
   });
 
-  const blankTarget = document.createElement("div");
-  blankTarget.className = "blank-target";
-  blankTarget.addEventListener("click", () => {
-    console.log("Blank target clicked. Appending new paragraph at end.");
-    insertBlock("paragraph", "", state.blocks.length, { justCreated: true });
-  });
-  scriptCanvas.appendChild(blankTarget);
+  // Final insert button after last block
+  const finalInsertBtn = document.createElement("button");
+  finalInsertBtn.type = "button";
+  if (isMoving) {
+    finalInsertBtn.className = "block-insert-btn move-target";
+    finalInsertBtn.textContent = "\u2192 \u25cb \u2190";
+    finalInsertBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      moveBlockTo(state.blocks.length);
+    });
+  } else {
+    finalInsertBtn.className = "block-insert-btn";
+    finalInsertBtn.textContent = "+";
+    finalInsertBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      insertBlock("paragraph", "", state.blocks.length, { justCreated: true });
+    });
+  }
+  scriptCanvas.appendChild(finalInsertBtn);
+
   applyPresenceHighlightsToDom();
+}
+
+function formatBlockHTML(text, type) {
+  if (!text) return "";
+  if (type === "paragraph" || type === "action") {
+    return `<i>${text}</i>`;
+  }
+  return text.replace(/\(([^)]*)\)/g, (match) => `<i>${match}</i>`);
+}
+
+function toggleMoveMode(index) {
+  if (state.movingBlockIndex === index) {
+    state.movingBlockIndex = -1;
+  } else {
+    state.movingBlockIndex = index;
+  }
+  renderBlocks();
+}
+
+function moveBlockTo(targetIndex) {
+  const srcIndex = state.movingBlockIndex;
+  if (srcIndex < 0 || srcIndex >= state.blocks.length) {
+    state.movingBlockIndex = -1;
+    renderBlocks();
+    return;
+  }
+  const [block] = state.blocks.splice(srcIndex, 1);
+  const insertAt = targetIndex > srcIndex ? targetIndex - 1 : targetIndex;
+  state.blocks.splice(insertAt, 0, block);
+  state.activeIndex = insertAt;
+  state.movingBlockIndex = -1;
+  state.typingLockUntil = Date.now() + 1000;
+  scheduleSave();
+  renderBlocks();
+  updatePresenceNow(false);
 }
 
 function selectBlock(index, focusEditor) {
@@ -482,42 +497,7 @@ function focusActiveTextAtEnd() {
   moveCaretToEnd(activeText);
 }
 
-function openContextMenu(index, x, y) {
-  console.log(`Opening context menu for block ${index} at coordination (${x}, ${y}).`);
-  state.contextIndex = index;
-  contextMenu.innerHTML = "";
 
-  const actions = [
-    { key: "contextDelete", action: () => { console.log(`Action: Delete block at ${index}`); deleteBlock(index); } },
-    { key: "contextAddBefore", action: () => { console.log(`Action: Insert paragraph before block ${index}`); insertBlock("paragraph", "", index, { justCreated: true }); } },
-    { key: "contextAddAfter", action: () => { console.log(`Action: Insert paragraph after block ${index}`); insertBlock("paragraph", "", index + 1, { justCreated: true }); } }
-  ];
-
-  actions.forEach((item) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = getText(state.language, item.key);
-    button.addEventListener("click", (menuEvent) => {
-      menuEvent.stopPropagation();
-      item.action();
-      closeContextMenu();
-    });
-    contextMenu.appendChild(button);
-  });
-
-  contextMenu.classList.remove("hidden");
-  const maxX = Math.max(8, window.innerWidth - 180);
-  const maxY = Math.max(8, window.innerHeight - 220);
-  contextMenu.style.left = `${Math.min(x, maxX)}px`;
-  contextMenu.style.top = `${Math.min(y, maxY)}px`;
-}
-
-function closeContextMenu() {
-  if (!contextMenu.classList.contains("hidden")) {
-    console.log("Closing context menu.");
-    contextMenu.classList.add("hidden");
-  }
-}
 
 function deleteBlock(index) {
   console.log(`Attempting to delete block at index ${index}.`);

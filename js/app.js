@@ -451,6 +451,7 @@ async function handleExportPdf() {
   container.style.color = "#000";
   container.style.backgroundColor = "#fff";
   container.style.lineHeight = "1";
+  container.style.textAlign = "center";
 
   // Title Page (Simulated)
   const titlePage = document.createElement("div");
@@ -463,15 +464,47 @@ async function handleExportPdf() {
   const title = document.createElement("h1");
   title.textContent = (metadata.title || "Untitled").toUpperCase();
   title.style.fontSize = "18pt";
-  title.style.textDecoration = "underline";
   title.style.marginBottom = "0.5in";
   titlePage.appendChild(title);
 
-  const author = document.createElement("p");
-  author.textContent = `By\n${metadata.createdBy || "Anonymous"}`;
-  author.style.whiteSpace = "pre-wrap";
-  titlePage.appendChild(author);
-  
+  // Add author below title
+  // const author = document.createElement("p");
+  // author.textContent = `By\n${metadata.createdBy || "Anonymous"}`;
+  // author.style.whiteSpace = "pre-wrap";
+  // titlePage.appendChild(author);
+
+  // Add plot/argument if available
+  if (metadata.argument && metadata.argument.trim()) {
+    const plot = document.createElement("p");
+    plot.textContent = metadata.argument;
+    plot.style.marginTop = "1.5em";
+    plot.style.fontStyle = "italic";
+    plot.style.whiteSpace = "pre-wrap";
+    titlePage.appendChild(plot);
+  }
+
+  // Add character list if available
+  if (Array.isArray(metadata.characters) && metadata.characters.length > 0) {
+    const charHeader = document.createElement("h2");
+    charHeader.textContent = getText(state.language, "characters");
+    charHeader.style.marginTop = "2em";
+    charHeader.style.fontSize = "1.1em";
+    titlePage.appendChild(charHeader);
+
+    const charList = document.createElement("ul");
+    charList.style.display = "inline-block";
+    charList.style.textAlign = "left";
+    charList.style.margin = "0 auto";
+    charList.style.padding = "0 1em";
+    charList.style.listStyle = "disc inside";
+    metadata.characters.forEach(c => {
+      const li = document.createElement("li");
+      li.textContent = c.name.toUpperCase() + (c.description ? `: ${c.description}` : "");
+      charList.appendChild(li);
+    });
+    titlePage.appendChild(charList);
+  }
+
   container.appendChild(titlePage);
 
   // Script Content
@@ -483,6 +516,7 @@ async function handleExportPdf() {
   blocks.forEach(blockText => {
     const blockDiv = document.createElement("div");
     blockDiv.style.marginBottom = "1.2em";
+    blockDiv.style.textAlign = "center";
 
     // Detect format from serializeBlocks output
     // Format is usually "CHARACTER: text" or just "text"
@@ -493,9 +527,9 @@ async function handleExportPdf() {
       // Dialogue Block
       const separatorIndex = firstLine.indexOf(":");
       const charName = firstLine.substring(0, separatorIndex).trim();
-      const dialogueText = firstLine.substring(separatorIndex + 1).trim();
+      const dialogueText = lines.slice(1).join("\n").trim();
 
-      // Character Name (Centered @ 3.5in from left, or simplified center)
+      // Character Name (Centered)
       const nameP = document.createElement("p");
       nameP.textContent = charName;
       nameP.style.textAlign = "center";
@@ -503,17 +537,18 @@ async function handleExportPdf() {
       nameP.style.width = "100%";
       blockDiv.appendChild(nameP);
 
-      // Dialogue (Centered with margins)
+      // Dialogue (Centered, justified, wider)
       const speechP = document.createElement("p");
-      speechP.style.width = "60%"; // Standard dialogue width
+      speechP.style.width = "80%"; // Wider dialogue width
       speechP.style.margin = "0 auto";
-      speechP.style.textAlign = "left";
+      speechP.style.textAlign = "justify";
       speechP.innerHTML = formatParenthesisItalics(dialogueText);
       blockDiv.appendChild(speechP);
     } else {
       // Action or Scene Heading
       const actionP = document.createElement("p");
       actionP.style.margin = "0";
+      actionP.style.textAlign = "justify";
       
       const isScene = firstLine.toUpperCase().startsWith("SCENE") || 
                       firstLine.toUpperCase().startsWith("INT.") || 
@@ -527,6 +562,7 @@ async function handleExportPdf() {
         // Regular action/description block
         actionP.innerHTML = formatBlockHTML(blockText, "paragraph");
       }
+      blockDiv.appendChild(actionP);
     }
     scriptContent.appendChild(blockDiv);
   });
@@ -558,54 +594,105 @@ async function handleSeePreview() {
   
   previewCanvas.innerHTML = "";
 
-  // Title Page
+  // Title Page (matching PDF export)
   const titleSection = document.createElement("div");
   titleSection.className = "page-title-section";
-  
+  titleSection.style.display = "flex";
+  titleSection.style.flexDirection = "column";
+  titleSection.style.justifyContent = "center";
+  titleSection.style.alignItems = "center";
+  titleSection.style.textAlign = "center";
+  titleSection.style.padding = "2em 0";
+
   const title = document.createElement("h1");
   title.textContent = (metadata.title || "Untitled").toUpperCase();
+  title.style.fontSize = "2em";
+  title.style.marginBottom = "0.5em";
   titleSection.appendChild(title);
 
-  const author = document.createElement("p");
-  author.className = "author";
-  author.textContent = `By\n${metadata.createdBy || "Anonymous"}`;
-  titleSection.appendChild(author);
-  
+  // const author = document.createElement("p");
+  // author.className = "author";
+  // author.textContent = `By\n${metadata.createdBy || "Anonymous"}`;
+  // author.style.whiteSpace = "pre-wrap";
+  // titleSection.appendChild(author);
+
+  // Add plot/argument if available
+  if (metadata.argument && metadata.argument.trim()) {
+    const plot = document.createElement("p");
+    plot.textContent = metadata.argument;
+    plot.style.marginTop = "1.5em";
+    plot.style.fontStyle = "italic";
+    plot.style.whiteSpace = "pre-wrap";
+    titleSection.appendChild(plot);
+  }
+
+  // Add character list if available
+  if (Array.isArray(metadata.characters) && metadata.characters.length > 0) {
+    const charHeader = document.createElement("h2");
+    charHeader.textContent = getText(state.language, "characters");
+    charHeader.style.marginTop = "2em";
+    charHeader.style.fontSize = "1.1em";
+    titleSection.appendChild(charHeader);
+
+    const charList = document.createElement("ul");
+    charList.style.display = "inline-block";
+    charList.style.textAlign = "left";
+    charList.style.margin = "0 auto";
+    charList.style.padding = "0 1em";
+    charList.style.listStyle = "disc inside";
+    metadata.characters.forEach(c => {
+      const li = document.createElement("li");
+      li.textContent = c.name.toUpperCase() + (c.description ? `: ${c.description}` : "");
+      charList.appendChild(li);
+    });
+    titleSection.appendChild(charList);
+  }
+
   previewCanvas.appendChild(titleSection);
 
   // Script Content
   const blocks = scriptText.split(/\n\s*\n/).filter(Boolean);
-  
+
   blocks.forEach(blockText => {
     const blockDiv = document.createElement("div");
     blockDiv.className = "preview-block";
+    blockDiv.style.textAlign = "center";
+    blockDiv.style.marginBottom = "1.2em";
 
     const lines = blockText.trim().split("\n");
     const firstLine = lines[0];
 
     if (firstLine.includes(":") && firstLine.split(":")[0] === firstLine.split(":")[0].toUpperCase() && !firstLine.includes("SCENE")) {
-      // Dialogue Block
+      // Dialogue Block (fetch dialogue as in handleExportPdf)
       const separatorIndex = firstLine.indexOf(":");
       const charName = firstLine.substring(0, separatorIndex).trim();
-      const dialogueText = firstLine.substring(separatorIndex + 1).trim();
+      const dialogueText = lines.slice(1).join("\n").trim();
 
       const nameP = document.createElement("p");
       nameP.className = "preview-char";
       nameP.textContent = charName;
+      nameP.style.textAlign = "center";
+      nameP.style.margin = "0 0 0.2em 0";
+      nameP.style.width = "100%";
       blockDiv.appendChild(nameP);
 
       const speechP = document.createElement("p");
       speechP.className = "preview-dialogue";
-      speechP.innerHTML = formatBlockHTML(dialogueText, "dialogue");
+      speechP.style.width = "80%";
+      speechP.style.margin = "0 auto";
+      speechP.style.textAlign = "justify";
+      speechP.innerHTML = formatParenthesisItalics(dialogueText);
       blockDiv.appendChild(speechP);
     } else {
       // Action or Scene Heading
       const actionP = document.createElement("p");
-      
+      actionP.style.margin = "0";
+      actionP.style.textAlign = "justify";
+
       const isScene = firstLine.toUpperCase().startsWith("SCENE") || 
                       firstLine.toUpperCase().startsWith("INT.") || 
                       firstLine.toUpperCase().startsWith("EXT.");
-      
+
       if (isScene) {
         actionP.className = "preview-scene";
         actionP.innerHTML = formatBlockHTML(blockText, "action");
@@ -763,11 +850,16 @@ function formatBlockHTML(text, type) {
   return text.replace(/\(([^)]*)\)/g, (match) => `<i>${match}</i>`);
 }
 
+function formatParenthesisItalics(text) {
+  if (!text) return "";
+  return text.replace(/\(([^)]*)\)/g, "<i>($1)</i>");
+}
+
 function updateUrl(mode, roomCode) {
   const params = new URLSearchParams();
   if (mode === "wizard") {
     params.set("mode", "wizard");
-  }
+  } 
   if (roomCode) {
     params.set("room", roomCode);
   }
