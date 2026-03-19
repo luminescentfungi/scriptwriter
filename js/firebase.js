@@ -6,6 +6,7 @@ import {
   get,
   onValue,
   update,
+  push,
   runTransaction,
   serverTimestamp,
   onDisconnect
@@ -190,5 +191,51 @@ export async function updatePresence(roomCode, userId, payload) {
   await update(userRef, {
     ...payload,
     updatedAt: serverTimestamp()
+  });
+}
+
+export async function saveScriptState(roomCode, stateName, rawText, userName) {
+  const statesRef = ref(db, `${ROOMS_ROOT}/${roomCode}/states`);
+  const newStateRef = push(statesRef);
+  await set(newStateRef, {
+    name: stateName,
+    rawText,
+    savedBy: userName,
+    savedAt: serverTimestamp()
+  });
+}
+
+export async function getScriptStates(roomCode) {
+  const statesRef = ref(db, `${ROOMS_ROOT}/${roomCode}/states`);
+  const snapshot = await get(statesRef);
+  if (!snapshot.exists()) return [];
+  const data = snapshot.val();
+  return Object.entries(data).map(([id, state]) => ({ id, ...state }));
+}
+
+export async function deleteScriptState(roomCode, stateId) {
+  const stateRef = ref(db, `${ROOMS_ROOT}/${roomCode}/states/${stateId}`);
+  await set(stateRef, null);
+}
+
+export async function loadScriptState(roomCode, stateId) {
+  const stateRef = ref(db, `${ROOMS_ROOT}/${roomCode}/states/${stateId}`);
+  const snapshot = await get(stateRef);
+  if (!snapshot.exists()) return null;
+  return snapshot.val();
+}
+
+export async function notifyStateChange(roomCode, userName) {
+  const changeRef = ref(db, `${ROOMS_ROOT}/${roomCode}/stateChange`);
+  await set(changeRef, {
+    changedBy: userName,
+    timestamp: serverTimestamp()
+  });
+}
+
+export function subscribeToStateChange(roomCode, callback) {
+  const changeRef = ref(db, `${ROOMS_ROOT}/${roomCode}/stateChange`);
+  return onValue(changeRef, (snapshot) => {
+    callback(snapshot.val());
   });
 }

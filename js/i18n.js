@@ -66,7 +66,23 @@ const translations = {
     scriptNotes: "Script Notes",
     notesPlaceholder: "Write your internal notes here...",
     metadataLocked: "is editing right now",
-    metadataLockedBy: "The script metadata is currently locked by"
+    metadataLockedBy: "The script metadata is currently locked by",
+    selectCharacter: "Select character",
+    moreCharacters: "More characters",
+    stateManagement: "States",
+    saveState: "Save current state",
+    loadState: "Load",
+    deleteState: "Delete",
+    stateNamePrompt: "Enter a name for this state:",
+    saveBeforeLoad: "Do you want to save the current state before loading a new one?",
+    confirmLoadState: "This will replace the current script for everyone. Are you sure you want to continue?",
+    stateLoaded: "State loaded successfully.",
+    stateDeleted: "State deleted.",
+    stateSaved: "State saved successfully.",
+    noStates: "No saved states.",
+    confirmDelete: "Are you sure you want to delete this state?",
+    userLoadingState: "is loading a previous script state. The page will reload.",
+    savedStates: "Saved States"
   },
   es: {
     appName: "Escritura de Guión Colaborativa",
@@ -135,7 +151,23 @@ const translations = {
     scriptNotes: "Notas del Guion",
     notesPlaceholder: "Escribe tus notas internas aquí...",
     metadataLocked: "está editando ahora",
-    metadataLockedBy: "La información de la obra está siendo editada por"
+    metadataLockedBy: "La información de la obra está siendo editada por",
+    selectCharacter: "Seleccionar personaje",
+    moreCharacters: "Más personajes",
+    stateManagement: "Estados",
+    saveState: "Guardar estado actual",
+    loadState: "Cargar",
+    deleteState: "Eliminar",
+    stateNamePrompt: "Introduce un nombre para este estado:",
+    saveBeforeLoad: "¿Quieres guardar el estado actual antes de cargar uno nuevo?",
+    confirmLoadState: "Esto reemplazará el guion actual para todos. ¿Estás seguro de que quieres continuar?",
+    stateLoaded: "Estado cargado correctamente.",
+    stateDeleted: "Estado eliminado.",
+    stateSaved: "Estado guardado correctamente.",
+    noStates: "No hay estados guardados.",
+    confirmDelete: "¿Estás seguro de que quieres eliminar este estado?",
+    userLoadingState: "está cargando un estado anterior del guion. La página se recargará.",
+    savedStates: "Estados Guardados"
   }
 };
 

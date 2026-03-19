@@ -4,7 +4,8 @@
   updateScript,
   subscribeToPresence,
   registerPresence,
-  updatePresence
+  updatePresence,
+  subscribeToStateChange
 } from "./firebase.js";
 import {
   getStoredLanguage,
@@ -12,7 +13,9 @@ import {
   getStoredUserName,
   setStoredUserName,
   getStoredRoomCode,
-  setStoredRoomCode
+  setStoredRoomCode,
+  getRecentCharacters,
+  updateRecentCharacters
 } from "./storage.js";
 import { applyStaticTranslations, getText, languageOptions } from "./i18n.js";
 
@@ -36,6 +39,7 @@ const state = {
   typingLockUntil: 0,
   roomUnsubscribe: null,
   presenceUnsubscribe: null,
+  stateChangeUnsubscribe: null,
   localUserId: makeUserId(),
   lastRemoteRaw: "",
   keyboardOpen: false,
@@ -105,6 +109,7 @@ async function init() {
   hydrateRoomView();
   setupRealtime();
   setupPresence();
+  setupStateChangeListener();
 }
 
 function bindEvents() {
@@ -173,23 +178,80 @@ function hydrateRoomHeader() {
 function renderCharacterButtons() {
   characterButtons.innerHTML = "";
   const characters = state.roomData?.metadata?.characters || [];
+  const isNarrow = window.innerWidth <= 640;
+  const allNames = characters.map(c => typeof c === "object" ? c.name : c);
 
-  const descButton = document.createElement("button");
-  descButton.type = "button";
-  descButton.textContent = "📝";
-  descButton.addEventListener("click", () => {
-    insertBlock("paragraph", "", state.blocks.length, { justCreated: true });
-  });
-  characterButtons.appendChild(descButton);
+  if (isNarrow && allNames.length > 4) {
+    const recentNames = getRecentCharacters(state.roomCode);
+    let displayChars = recentNames.filter(name => allNames.includes(name));
+    for (const name of allNames) {
+      if (displayChars.length >= 4) break;
+      if (!displayChars.includes(name)) {
+        displayChars.push(name);
+      }
+    }
+    displayChars = displayChars.slice(0, 4);
 
-  characters.forEach((charObj) => {
-    const characterName = typeof charObj === "object" ? charObj.name : charObj;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = characterName;
-    button.addEventListener("click", () => applyCharacterToSelection(characterName));
-    characterButtons.appendChild(button);
+    displayChars.forEach(name => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = name;
+      button.addEventListener("click", () => applyCharacterToSelection(name));
+      characterButtons.appendChild(button);
+    });
+
+    const plusBtn = document.createElement("button");
+    plusBtn.type = "button";
+    plusBtn.textContent = "+";
+    plusBtn.className = "char-more-btn";
+    plusBtn.addEventListener("click", openCharacterPopup);
+    characterButtons.appendChild(plusBtn);
+  } else {
+    allNames.forEach((characterName) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = characterName;
+      button.addEventListener("click", () => applyCharacterToSelection(characterName));
+      characterButtons.appendChild(button);
+    });
+  }
+}
+
+function openCharacterPopup() {
+  let popup = document.getElementById("charPopup");
+  if (popup) popup.remove();
+
+  popup = document.createElement("div");
+  popup.id = "charPopup";
+  popup.className = "char-popup-overlay";
+
+  const panel = document.createElement("div");
+  panel.className = "char-popup-panel";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "char-popup-close";
+  closeBtn.textContent = "\u2715";
+  closeBtn.addEventListener("click", () => popup.remove());
+  panel.appendChild(closeBtn);
+
+  const characters = state.roomData?.metadata?.characters || [];
+  characters.forEach(charObj => {
+    const name = typeof charObj === "object" ? charObj.name : charObj;
+    const btn = document.createElement("button");
+    btn.className = "char-popup-btn";
+    btn.textContent = name;
+    btn.addEventListener("click", () => {
+      popup.remove();
+      applyCharacterToSelection(name);
+    });
+    panel.appendChild(btn);
   });
+
+  popup.appendChild(panel);
+  popup.addEventListener("click", (e) => {
+    if (e.target === popup) popup.remove();
+  });
+  document.body.appendChild(popup);
 }
 
 function applyCharacterToSelection(character) {
@@ -225,9 +287,12 @@ function applyCharacterToSelection(character) {
     return;
   }
 
+  updateRecentCharacters(state.roomCode, character);
+
   activeBlock.justCreated = false;
   state.typingLockUntil = Date.now() + 1000;
   scheduleSave();
+  renderCharacterButtons();
   renderBlocks();
   focusActiveTextAtEnd();
   updatePresenceNow(false);
@@ -883,6 +948,22 @@ function setCaretOffset(element, offset) {
   }
 }
 
+let stateChangeInitialized = false;
+
+function setupStateChangeListener() {
+  state.stateChangeUnsubscribe = subscribeToStateChange(state.roomCode, (data) => {
+    if (!stateChangeInitialized) {
+      stateChangeInitialized = true;
+      return;
+    }
+    if (!data || !data.changedBy) return;
+    if (data.changedBy === state.userName) return;
+
+    alert(`${data.changedBy} ${getText(state.language, "userLoadingState")}`);
+    window.location.reload();
+  });
+}
+
 function cleanupSubscriptions() {
   console.log("Cleaning up active database subscriptions.");
   if (state.roomUnsubscribe) {
@@ -893,6 +974,11 @@ function cleanupSubscriptions() {
   if (state.presenceUnsubscribe) {
     state.presenceUnsubscribe();
     state.presenceUnsubscribe = null;
+  }
+
+  if (state.stateChangeUnsubscribe) {
+    state.stateChangeUnsubscribe();
+    state.stateChangeUnsubscribe = null;
   }
 }
 

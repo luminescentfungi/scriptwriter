@@ -441,3 +441,65 @@ select {
     display: none;
   }
 }
+
+/* Character selection popup */
+.char-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.char-popup-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem;
+  min-width: 220px;
+  max-width: 80vw;
+  max-height: 70vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.char-popup-close {
+  align-self: flex-end;
+  border: none;
+  background: #e53935;
+  color: #fff;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.char-popup-btn {
+  border: none;
+  background: var(--salmon);
+  color: #000;
+  border-radius: 999px;
+  padding: 0.65rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+}
+
+.char-more-btn {
+  background: var(--primary) !important;
+  color: #fff !important;
+  font-weight: 700;
+  font-size: 1.1rem;
+}

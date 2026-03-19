@@ -76,6 +76,7 @@
         <button type="button" id="seePreviewBtn" class="secondary" data-i18n="seePreview">See Preview</button>
         <button type="button" id="exportDocx" class="secondary" data-i18n="exportDocx" hidden="true">Export DOCX</button>
         <button type="button" id="seeNotesBtn" class="secondary" data-i18n="seeNotes">See Notes</button>
+        <button type="button" id="manageStatesBtn" class="secondary" data-i18n="stateManagement">States</button>
       </div>
 
       <form id="wizardForm" class="form-grid">
@@ -132,6 +133,17 @@
         </div>
         <div id="previewCanvas" class="preview-canvas"></div>
       </div>o
+    </div>
+
+    <div id="statesModal" class="modal hidden">
+      <div class="modal-content card states-modal-content">
+        <div class="states-header">
+          <h2 data-i18n="savedStates">Saved States</h2>
+          <button type="button" id="closeStates" class="secondary" data-i18n="close">Close</button>
+        </div>
+        <button type="button" id="saveStateBtn" class="primary" data-i18n="saveState">Save current state</button>
+        <div id="statesList" class="states-list"></div>
+      </div>
     </div>
   </main>
 

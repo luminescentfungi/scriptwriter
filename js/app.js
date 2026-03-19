@@ -4,7 +4,13 @@ import {
   updateRoomMetadata,
   subscribeToMetadataLock,
   tryAcquireMetadataLock,
-  releaseMetadataLock
+  releaseMetadataLock,
+  saveScriptState,
+  getScriptStates,
+  deleteScriptState,
+  loadScriptState,
+  notifyStateChange,
+  updateScript
 } from "./firebase.js";
 import {
   getStoredLanguage,
@@ -47,6 +53,12 @@ const characterForm = document.getElementById("characterForm");
 const modalCharName = document.getElementById("modalCharName");
 const modalCharDesc = document.getElementById("modalCharDesc");
 const cancelCharButton = document.getElementById("cancelChar");
+
+const manageStatesBtn = document.getElementById("manageStatesBtn");
+const statesModal = document.getElementById("statesModal");
+const closeStatesBtn = document.getElementById("closeStates");
+const saveStateBtn = document.getElementById("saveStateBtn");
+const statesList = document.getElementById("statesList");
 
 document.getElementById("addCharacterBtn").addEventListener("click", () => openCharacterModal());
 
@@ -218,6 +230,10 @@ function bindEvents() {
   seePreviewButton.addEventListener("click", handleSeePreview);
   closePreviewButton.addEventListener("click", () => previewModal.classList.add("hidden"));
   exportDocxButton.addEventListener("click", handleExportDocx);
+
+  manageStatesBtn.addEventListener("click", handleOpenStates);
+  closeStatesBtn.addEventListener("click", () => statesModal.classList.add("hidden"));
+  saveStateBtn.addEventListener("click", handleSaveState);
 
   joinForm.addEventListener("submit", handleJoin);
   wizardForm.addEventListener("submit", handleWizardSubmit);
@@ -867,6 +883,120 @@ function updateUrl(mode, roomCode) {
   const query = params.toString();
   const nextUrl = query ? `?${query}` : window.location.pathname;
   window.history.replaceState({}, "", nextUrl);
+}
+
+async function handleOpenStates() {
+  if (!state.editRoomCode) return;
+  await refreshStatesList();
+  statesModal.classList.remove("hidden");
+}
+
+async function refreshStatesList() {
+  const states = await getScriptStates(state.editRoomCode);
+  statesList.innerHTML = "";
+
+  if (!states.length) {
+    const empty = document.createElement("p");
+    empty.textContent = getText(state.language, "noStates");
+    empty.style.textAlign = "center";
+    empty.style.color = "#999";
+    statesList.appendChild(empty);
+    return;
+  }
+
+  states.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+
+  states.forEach(stateItem => {
+    const row = document.createElement("div");
+    row.className = "state-row";
+
+    const info = document.createElement("div");
+    info.className = "state-info";
+    const nameEl = document.createElement("strong");
+    nameEl.textContent = stateItem.name;
+    const metaEl = document.createElement("small");
+    metaEl.textContent = `${stateItem.savedBy || "?"} — ${formatStateTimestamp(stateItem.savedAt)}`;
+    info.appendChild(nameEl);
+    info.appendChild(metaEl);
+
+    const actions = document.createElement("div");
+    actions.className = "state-actions";
+
+    const loadBtn = document.createElement("button");
+    loadBtn.className = "primary";
+    loadBtn.textContent = getText(state.language, "loadState");
+    loadBtn.addEventListener("click", () => handleLoadState(stateItem));
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "secondary state-delete-btn";
+    delBtn.textContent = getText(state.language, "deleteState");
+    delBtn.addEventListener("click", () => handleDeleteState(stateItem.id));
+
+    actions.appendChild(loadBtn);
+    actions.appendChild(delBtn);
+    row.appendChild(info);
+    row.appendChild(actions);
+    statesList.appendChild(row);
+  });
+}
+
+function formatStateTimestamp(ts) {
+  if (!ts) return "?";
+  const date = new Date(ts);
+  return date.toLocaleString();
+}
+
+async function handleSaveState() {
+  if (!state.editRoomCode) return;
+
+  const now = new Date();
+  const defaultName = now.toLocaleString();
+  const name = prompt(getText(state.language, "stateNamePrompt"), defaultName);
+  if (!name) return;
+
+  const room = await getRoom(state.editRoomCode);
+  if (!room) return;
+
+  const rawText = room.script?.rawText || "";
+  await saveScriptState(state.editRoomCode, name, rawText, state.userName);
+  await refreshStatesList();
+  alert(getText(state.language, "stateSaved"));
+}
+
+async function handleLoadState(stateItem) {
+  if (!state.editRoomCode) return;
+
+  const wantSave = confirm(getText(state.language, "saveBeforeLoad"));
+  if (wantSave) {
+    const now = new Date();
+    const defaultName = now.toLocaleString();
+    const saveName = prompt(getText(state.language, "stateNamePrompt"), defaultName);
+    if (saveName) {
+      const room = await getRoom(state.editRoomCode);
+      if (room) {
+        await saveScriptState(state.editRoomCode, saveName, room.script?.rawText || "", state.userName);
+      }
+    }
+  }
+
+  const confirmLoad = confirm(getText(state.language, "confirmLoadState"));
+  if (!confirmLoad) return;
+
+  const stateData = await loadScriptState(state.editRoomCode, stateItem.id);
+  if (!stateData) return;
+
+  await updateScript(state.editRoomCode, stateData.rawText, state.userName);
+  await notifyStateChange(state.editRoomCode, state.userName);
+
+  statesModal.classList.add("hidden");
+  alert(getText(state.language, "stateLoaded"));
+  window.location.href = buildEditorUrl(state.editRoomCode);
+}
+
+async function handleDeleteState(stateId) {
+  if (!confirm(getText(state.language, "confirmDelete"))) return;
+  await deleteScriptState(state.editRoomCode, stateId);
+  await refreshStatesList();
 }
 
 init();
