@@ -48,6 +48,14 @@ const saveNotesButton = document.getElementById("saveNotes");
 const cancelNotesButton = document.getElementById("cancelNotes");
 const metadataLockInfo = document.getElementById("metadataLockInfo");
 
+// Export Mobile Elements
+const previewExportMobileBtn = document.getElementById("previewExportMobile");
+const exportPopup = document.getElementById("exportPopup");
+const closeExportPopupBtn = document.getElementById("closeExportPopup");
+const exportPdfMobileBtn = document.getElementById("exportPdfMobile");
+const seePreviewMobileBtn = document.getElementById("seePreviewMobile");
+const exportDocxMobileBtn = document.getElementById("exportDocxMobile");
+
 const characterModal = document.getElementById("characterModal");
 const characterForm = document.getElementById("characterForm");
 const modalCharName = document.getElementById("modalCharName");
@@ -230,6 +238,22 @@ function bindEvents() {
   seePreviewButton.addEventListener("click", handleSeePreview);
   closePreviewButton.addEventListener("click", () => previewModal.classList.add("hidden"));
   exportDocxButton.addEventListener("click", handleExportDocx);
+
+  // Mobile export events
+  previewExportMobileBtn.addEventListener("click", () => exportPopup.classList.remove("hidden"));
+  closeExportPopupBtn.addEventListener("click", () => exportPopup.classList.add("hidden"));
+  exportPdfMobileBtn.addEventListener("click", () => {
+    handleExportPdf();
+    exportPopup.classList.add("hidden");
+  });
+  seePreviewMobileBtn.addEventListener("click", () => {
+    handleSeePreview();
+    exportPopup.classList.add("hidden");
+  });
+  exportDocxMobileBtn.addEventListener("click", () => {
+    handleExportDocx();
+    exportPopup.classList.add("hidden");
+  });
 
   manageStatesBtn.addEventListener("click", handleOpenStates);
   closeStatesBtn.addEventListener("click", () => statesModal.classList.add("hidden"));
@@ -450,189 +474,46 @@ async function handleWizardSubmit(event) {
   }
 }
 
-async function handleExportPdf() {
-  if (!state.editRoomCode) return;
-  const room = await getRoom(state.editRoomCode);
-  if (!room) return;
-
-  const metadata = room.metadata || {};
-  const scriptText = room.script?.rawText || "";
-  
-  // Create a temporary container for PDF generation
+/**
+ * Builds a DOM node representing the full script (title page + content).
+ * Used by PDF export, preview, and DOCX export to avoid duplication.
+ */
+function buildScriptDOM(metadata, scriptText, format = 'preview') {
   const container = document.createElement("div");
-  container.className = "pdf-export-content";
-  container.style.padding = "1in"; // Standard script margins
+  container.className = "script-export-content";
+  // Inline styles are intentional: they ensure correct rendering both in the
+  // live preview and when html2pdf captures the node off-screen.
+  container.style.padding = "1in";
   container.style.fontSize = "12pt";
   container.style.fontFamily = "'Courier New', Courier, monospace";
   container.style.color = "#000";
   container.style.backgroundColor = "#fff";
-  container.style.lineHeight = "1";
+  container.style.lineHeight = "1.4";
   container.style.textAlign = "center";
 
-  // Title Page (Simulated)
-  const titlePage = document.createElement("div");
-  titlePage.style.height = "9.5in"; // Fill page
-  titlePage.style.display = "flex";
-  titlePage.style.flexDirection = "column";
-  titlePage.style.justifyContent = "center";
-  titlePage.style.textAlign = "center";
-
-  const title = document.createElement("h1");
-  title.textContent = (metadata.title || "Untitled").toUpperCase();
-  title.style.fontSize = "18pt";
-  title.style.marginBottom = "0.5in";
-  titlePage.appendChild(title);
-
-  // Add author below title
-  // const author = document.createElement("p");
-  // author.textContent = `By\n${metadata.createdBy || "Anonymous"}`;
-  // author.style.whiteSpace = "pre-wrap";
-  // titlePage.appendChild(author);
-
-  // Add plot/argument if available
-  if (metadata.argument && metadata.argument.trim()) {
-    const plot = document.createElement("p");
-    plot.textContent = metadata.argument;
-    plot.style.marginTop = "1.5em";
-    plot.style.fontStyle = "italic";
-    plot.style.whiteSpace = "pre-wrap";
-    titlePage.appendChild(plot);
-  }
-
-  // Add character list if available
-  if (Array.isArray(metadata.characters) && metadata.characters.length > 0) {
-    const charHeader = document.createElement("h2");
-    charHeader.textContent = getText(state.language, "characters");
-    charHeader.style.marginTop = "2em";
-    charHeader.style.fontSize = "1.1em";
-    titlePage.appendChild(charHeader);
-
-    const charList = document.createElement("ul");
-    charList.style.display = "inline-block";
-    charList.style.textAlign = "left";
-    charList.style.margin = "0 auto";
-    charList.style.padding = "0 1em";
-    charList.style.listStyle = "disc inside";
-    metadata.characters.forEach(c => {
-      const li = document.createElement("li");
-      li.textContent = c.name.toUpperCase() + (c.description ? `: ${c.description}` : "");
-      charList.appendChild(li);
-    });
-    titlePage.appendChild(charList);
-  }
-
-  container.appendChild(titlePage);
-
-  // Script Content
-  const scriptContent = document.createElement("div");
-  
-  // Process script into lines/blocks
-  const blocks = scriptText.split(/\n\s*\n/).filter(Boolean);
-  
-  blocks.forEach(blockText => {
-    const blockDiv = document.createElement("div");
-    blockDiv.style.marginBottom = "1.2em";
-    blockDiv.style.textAlign = "center";
-
-    // Detect format from serializeBlocks output
-    // Format is usually "CHARACTER: text" or just "text"
-    const lines = blockText.trim().split("\n");
-    const firstLine = lines[0];
-
-    if (firstLine.includes(":") && firstLine.split(":")[0] === firstLine.split(":")[0].toUpperCase() && !firstLine.includes("SCENE")) {
-      // Dialogue Block
-      const separatorIndex = firstLine.indexOf(":");
-      const charName = firstLine.substring(0, separatorIndex).trim();
-      const dialogueText = lines.slice(1).join("\n").trim();
-
-      // Character Name (Centered)
-      const nameP = document.createElement("p");
-      nameP.textContent = charName;
-      nameP.style.textAlign = "center";
-      nameP.style.margin = "0 0 0.2em 0";
-      nameP.style.width = "100%";
-      blockDiv.appendChild(nameP);
-
-      // Dialogue (Centered, justified, wider)
-      const speechP = document.createElement("p");
-      speechP.style.width = "80%"; // Wider dialogue width
-      speechP.style.margin = "0 auto";
-      speechP.style.textAlign = "justify";
-      speechP.innerHTML = formatParenthesisItalics(dialogueText);
-      blockDiv.appendChild(speechP);
-    } else {
-      // Action or Scene Heading
-      const actionP = document.createElement("p");
-      actionP.style.margin = "0";
-      actionP.style.textAlign = "justify";
-      
-      const isScene = firstLine.toUpperCase().startsWith("SCENE") || 
-                      firstLine.toUpperCase().startsWith("INT.") || 
-                      firstLine.toUpperCase().startsWith("EXT.");
-      
-      if (isScene) {
-        actionP.style.fontWeight = "bold";
-        actionP.style.textTransform = "uppercase";
-        actionP.innerHTML = formatBlockHTML(blockText, "action");
-      } else {
-        // Regular action/description block
-        actionP.innerHTML = formatBlockHTML(blockText, "paragraph");
-      }
-      blockDiv.appendChild(actionP);
-    }
-    scriptContent.appendChild(blockDiv);
-  });
-
-  container.appendChild(scriptContent);
-  document.body.appendChild(container);
-
-  const opt = {
-    margin: [0.5, 0.5, 0.5, 0.5],
-    filename: `${(metadata.title || "script").replace(/\s+/g, "_")}.pdf`,
-    image: { type: "jpeg", quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-  };
-
-  html2pdf().from(container).set(opt).save().then(() => {
-    document.body.removeChild(container);
-  });
-}
-
-async function handleSeePreview() {
-  if (!state.editRoomCode) return;
-  const room = await getRoom(state.editRoomCode);
-  if (!room) return;
-
-  const metadata = room.metadata || {};
-  const scriptText = room.script?.rawText || "";
-  
-  previewCanvas.innerHTML = "";
-
-  // Title Page (matching PDF export)
+  // --- Title section ---
   const titleSection = document.createElement("div");
   titleSection.className = "page-title-section";
-  titleSection.style.display = "flex";
-  titleSection.style.flexDirection = "column";
-  titleSection.style.justifyContent = "center";
-  titleSection.style.alignItems = "center";
-  titleSection.style.textAlign = "center";
-  titleSection.style.padding = "2em 0";
+  if (format === 'doc') {
+    titleSection.style.display = "block";
+    titleSection.style.textAlign = "center";
+    titleSection.style.padding = "2em 0 3em";
+    titleSection.style.pageBreakAfter = "always";
+  } else {
+    titleSection.style.display = "flex";
+    titleSection.style.flexDirection = "column";
+    titleSection.style.justifyContent = "center";
+    titleSection.style.alignItems = "center";
+    titleSection.style.textAlign = "center";
+    titleSection.style.padding = "2em 0 3em";
+  }
 
-  const title = document.createElement("h1");
-  title.textContent = (metadata.title || "Untitled").toUpperCase();
-  title.style.fontSize = "2em";
-  title.style.marginBottom = "0.5em";
-  titleSection.appendChild(title);
+  const titleEl = document.createElement("h1");
+  titleEl.textContent = (metadata.title || "Untitled").toUpperCase();
+  titleEl.style.fontSize = "18pt";
+  titleEl.style.marginBottom = "0.5em";
+  titleSection.appendChild(titleEl);
 
-  // const author = document.createElement("p");
-  // author.className = "author";
-  // author.textContent = `By\n${metadata.createdBy || "Anonymous"}`;
-  // author.style.whiteSpace = "pre-wrap";
-  // titleSection.appendChild(author);
-
-  // Add plot/argument if available
   if (metadata.argument && metadata.argument.trim()) {
     const plot = document.createElement("p");
     plot.textContent = metadata.argument;
@@ -642,7 +523,6 @@ async function handleSeePreview() {
     titleSection.appendChild(plot);
   }
 
-  // Add character list if available
   if (Array.isArray(metadata.characters) && metadata.characters.length > 0) {
     const charHeader = document.createElement("h2");
     charHeader.textContent = getText(state.language, "characters");
@@ -651,11 +531,20 @@ async function handleSeePreview() {
     titleSection.appendChild(charHeader);
 
     const charList = document.createElement("ul");
-    charList.style.display = "inline-block";
-    charList.style.textAlign = "left";
-    charList.style.margin = "0 auto";
-    charList.style.padding = "0 1em";
-    charList.style.listStyle = "disc inside";
+    if (format === 'doc') {
+      charList.style.display = "block";
+      charList.style.width = "70%";
+      charList.style.margin = "0.5em auto";
+      charList.style.paddingLeft = "1.5em";
+      charList.style.textAlign = "left";
+      charList.style.listStyle = "disc";
+    } else {
+      charList.style.display = "inline-block";
+      charList.style.textAlign = "left";
+      charList.style.margin = "0 auto";
+      charList.style.padding = "0 1em";
+      charList.style.listStyle = "disc inside";
+    }
     metadata.characters.forEach(c => {
       const li = document.createElement("li");
       li.textContent = c.name.toUpperCase() + (c.description ? `: ${c.description}` : "");
@@ -664,22 +553,27 @@ async function handleSeePreview() {
     titleSection.appendChild(charList);
   }
 
-  previewCanvas.appendChild(titleSection);
+  container.appendChild(titleSection);
 
-  // Script Content
+  // --- Script content ---
+  const scriptContent = document.createElement("div");
   const blocks = scriptText.split(/\n\s*\n/).filter(Boolean);
 
   blocks.forEach(blockText => {
     const blockDiv = document.createElement("div");
     blockDiv.className = "preview-block";
+    blockDiv.style.marginBottom = format === 'doc' ? "2.5em" : "1.2em";
     blockDiv.style.textAlign = "center";
-    blockDiv.style.marginBottom = "1.2em";
 
     const lines = blockText.trim().split("\n");
     const firstLine = lines[0];
 
-    if (firstLine.includes(":") && firstLine.split(":")[0] === firstLine.split(":")[0].toUpperCase() && !firstLine.includes("SCENE")) {
-      // Dialogue Block (fetch dialogue as in handleExportPdf)
+    if (
+      firstLine.includes(":") &&
+      firstLine.split(":")[0] === firstLine.split(":")[0].toUpperCase() &&
+      !firstLine.includes("SCENE")
+    ) {
+      // Dialogue block
       const separatorIndex = firstLine.indexOf(":");
       const charName = firstLine.substring(0, separatorIndex).trim();
       const dialogueText = lines.slice(1).join("\n").trim();
@@ -700,17 +594,20 @@ async function handleSeePreview() {
       speechP.innerHTML = formatParenthesisItalics(dialogueText);
       blockDiv.appendChild(speechP);
     } else {
-      // Action or Scene Heading
+      // Action or scene heading
+      const isScene =
+        firstLine.toUpperCase().startsWith("SCENE") ||
+        firstLine.toUpperCase().startsWith("INT.") ||
+        firstLine.toUpperCase().startsWith("EXT.");
+
       const actionP = document.createElement("p");
       actionP.style.margin = "0";
       actionP.style.textAlign = "justify";
 
-      const isScene = firstLine.toUpperCase().startsWith("SCENE") || 
-                      firstLine.toUpperCase().startsWith("INT.") || 
-                      firstLine.toUpperCase().startsWith("EXT.");
-
       if (isScene) {
         actionP.className = "preview-scene";
+        actionP.style.fontWeight = "bold";
+        actionP.style.textTransform = "uppercase";
         actionP.innerHTML = formatBlockHTML(blockText, "action");
       } else {
         actionP.className = "preview-action";
@@ -718,12 +615,62 @@ async function handleSeePreview() {
       }
       blockDiv.appendChild(actionP);
     }
-    previewCanvas.appendChild(blockDiv);
+    scriptContent.appendChild(blockDiv);
+    if (format === 'doc') {
+      const spacer = document.createElement("p");
+      spacer.innerHTML = "&nbsp;";
+      spacer.style.margin = "0";
+      spacer.style.lineHeight = "1";
+      scriptContent.appendChild(spacer);
+    }
   });
 
+  container.appendChild(scriptContent);
+  return container;
+}
+
+async function handleExportPdf() {
+  if (!state.editRoomCode) return;
+  const room = await getRoom(state.editRoomCode);
+  if (!room) return;
+
+  const metadata = room.metadata || {};
+  const scriptText = room.script?.rawText || "";
+
+  const container = buildScriptDOM(metadata, scriptText);
+  document.body.appendChild(container);
+
+  const opt = {
+    margin: [0.5, 0.5, 0.5, 0.5],
+    filename: `${(metadata.title || "script").replace(/\s+/g, "_")}.pdf`,
+    image: { type: "jpeg", quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+    pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+  };
+
+  html2pdf().from(container).set(opt).save().then(() => {
+    document.body.removeChild(container);
+  });
+}
+
+async function handleSeePreview() {
+  if (!state.editRoomCode) return;
+  const room = await getRoom(state.editRoomCode);
+  if (!room) return;
+
+  const metadata = room.metadata || {};
+  const scriptText = room.script?.rawText || "";
+
+  previewCanvas.innerHTML = "";
+  previewCanvas.appendChild(buildScriptDOM(metadata, scriptText));
   previewModal.classList.remove("hidden");
 }
 
+/**
+ * Exports the script as a .doc file using the Word-HTML format.
+ * No external library needed — Word and LibreOffice both open it natively.
+ */
 async function handleExportDocx() {
   if (!state.editRoomCode) return;
   const room = await getRoom(state.editRoomCode);
@@ -731,130 +678,43 @@ async function handleExportDocx() {
 
   const metadata = room.metadata || {};
   const scriptText = room.script?.rawText || "";
-  
-  // The library is usually exposed via window.docx when loaded from script tag
-  const docxLib = window.docx;
-  if (!docxLib) {
-    alert("DOCX library not loaded yet. Please wait a moment or refresh.");
-    return;
-  }
-  const { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } = docxLib;
+  const filename = `${(metadata.title || "script").replace(/\s+/g, "_")}.doc`;
 
-  const docChildren = [
-    // Title Page
-    new Paragraph({
-      text: (metadata.title || "Untitled").toUpperCase(),
-      heading: HeadingLevel.TITLE,
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 2000, after: 400 },
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      children: [
-        new TextRun({
-          text: `By\n${metadata.createdBy || "Anonymous"}`,
-          break: 1,
-        }),
-      ],
-      spacing: { after: 2000 },
-    }),
-    new Paragraph({ text: "", pageBreakBefore: true }),
-  ];
+  // Serialise the shared DOM into an HTML string
+  const scriptDOM = buildScriptDOM(metadata, scriptText, 'doc');
+  const bodyHTML = scriptDOM.innerHTML;
 
-  // Process script into lines/blocks
-  const blocks = scriptText.split(/\n\s*\n/).filter(Boolean);
-  
-  blocks.forEach(blockText => {
-    const lines = blockText.trim().split("\n");
-    const firstLine = lines[0];
+  const wordHTML = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="utf-8">
+  <title>${metadata.title || "Script"}</title>
+  <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->
+  <style>
+    body  { font-family: "Courier New", Courier, monospace; font-size: 12pt;
+            margin: 1in; color: #000; line-height: 1.4; }
+    h1    { text-align: center; font-size: 18pt; text-transform: uppercase; }
+    h2    { text-align: center; font-size: 13pt; }
+    .page-title-section { text-align: center; page-break-after: always; }
+    ul    { display: block; width: 70%; margin: 0.5em auto; padding-left: 1.5em; text-align: left; }
+    .preview-char     { text-align: center; margin: 0.8em 0 0.2em; }
+    .preview-dialogue { width: 60%; margin: 0 auto; text-align: justify; }
+    .preview-scene    { font-weight: bold; text-transform: uppercase; text-align: left; }
+    .preview-action   { font-style: italic; text-align: justify; }
+  </style>
+</head>
+<body>${bodyHTML}</body>
+</html>`.trim();
 
-    if (firstLine.includes(":") && firstLine.split(":")[0] === firstLine.split(":")[0].toUpperCase() && !firstLine.includes("SCENE")) {
-      // Dialogue Block
-      const separatorIndex = firstLine.indexOf(":");
-      const charName = firstLine.substring(0, separatorIndex).trim();
-      const dialogueText = firstLine.substring(separatorIndex + 1).trim();
-
-      // Character Name
-      docChildren.push(new Paragraph({
-        text: charName,
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 240 },
-      }));
-
-      // Dialogue
-      docChildren.push(new Paragraph({
-        children: parseTextForItalicsDocx(dialogueText, TextRun, false, "dialogue"),
-        indent: { left: 1440, right: 1440 }, // Approx margins for dialogue
-        spacing: { after: 120 },
-      }));
-    } else {
-      // Action or Scene Heading
-      const isScene = firstLine.toUpperCase().startsWith("SCENE") || 
-                      firstLine.toUpperCase().startsWith("INT.") || 
-                      firstLine.toUpperCase().startsWith("EXT.");
-      
-      const type = isScene ? "action" : "paragraph";
-      docChildren.push(new Paragraph({
-        children: parseTextForItalicsDocx(blockText, TextRun, isScene, type),
-        spacing: { before: 240, after: 120 },
-      }));
-    }
-  });
-
-  const doc = new Document({
-    sections: [{
-      properties: {},
-      children: docChildren,
-    }],
-  });
-
-  Packer.toBlob(doc).then((blob) => {
-    saveAs(blob, `${(metadata.title || "script").replace(/\s+/g, "_")}.docx`);
-  });
-}
-
-function parseTextForItalicsDocx(text, TextRun, isBold = false, type = "paragraph") {
-  const parts = [];
-
-  if (type === "paragraph" || type === "action") {
-    parts.push(new TextRun({
-      text: text,
-      italics: true,
-      bold: isBold
-    }));
-    return parts;
-  }
-
-  const regex = /\(([^)]*)\)/g;
-  let lastIndex = 0;
-  let match;
-
-  while ((match = regex.exec(text)) !== null) {
-    // Text before parenthesis
-    if (match.index > lastIndex) {
-      parts.push(new TextRun({
-        text: text.substring(lastIndex, match.index),
-        bold: isBold
-      }));
-    }
-    // Parenthesis text (italic)
-    parts.push(new TextRun({
-      text: match[0],
-      italics: true,
-      bold: isBold
-    }));
-    lastIndex = regex.lastIndex;
-  }
-
-  // Remaining text
-  if (lastIndex < text.length) {
-    parts.push(new TextRun({
-      text: text.substring(lastIndex),
-      bold: isBold
-    }));
-  }
-
-  return parts;
+  const blob = new Blob(["\ufeff", wordHTML], { type: "application/msword" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 

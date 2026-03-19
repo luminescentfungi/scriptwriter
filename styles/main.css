@@ -383,6 +383,67 @@ button.secondary:hover {
     border-radius: 14px;
     padding: 0.95rem;
   }
+
+  .mobile-hide {
+    display: none !important;
+  }
+
+  .mobile-show {
+    display: block !important;
+  }
+}
+
+.desktop-flex {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mobile-show {
+  display: none;
+}
+
+#previewExportMobile {
+  background: var(--export-green);
+  color: #fff;
+}
+
+#previewExportMobile:hover {
+  background: #1b5e20;
+}
+
+/* Modal and Popup styles */
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  cursor: pointer;
+  color: var(--text);
+  padding: 0;
+  line-height: 1;
+}
+
+.export-popup-content {
+  max-width: 400px;
+  width: 90%;
+  margin: auto;
+}
+
+.export-options {
+  display: grid;
+  gap: 1rem;
+}
+
+.export-popup-btn {
+  width: 100%;
+  padding: 1rem;
+  font-weight: 600;
 }
 
 /* States management */

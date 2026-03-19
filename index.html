@@ -72,9 +72,12 @@
       <div id="metadataLockInfo" class="lock-info hidden"></div>
 
       <div id="wizardHeaderActions" class="actions-row hidden" style="margin-bottom: 1rem;">
-        <button type="button" id="exportPdf" class="secondary" data-i18n="exportPdf" >Export PDF</button>
-        <button type="button" id="seePreviewBtn" class="secondary" data-i18n="seePreview">See Preview</button>
-        <button type="button" id="exportDocx" class="secondary" data-i18n="exportDocx" hidden="true">Export DOCX</button>
+        <div class="mobile-hide desktop-flex">
+          <button type="button" id="exportPdf" class="secondary" data-i18n="exportPdf" >Export PDF</button>
+          <button type="button" id="seePreviewBtn" class="secondary" data-i18n="seePreview">See Preview</button>
+          <button type="button" id="exportDocx" class="secondary" data-i18n="exportDocx">Export DOCX</button>
+        </div>
+        <button type="button" id="previewExportMobile" class="primary mobile-show" data-i18n="previewAndExport">Preview and Export</button>
         <button type="button" id="seeNotesBtn" class="secondary" data-i18n="seeNotes">See Notes</button>
         <button type="button" id="manageStatesBtn" class="secondary" data-i18n="stateManagement">States</button>
       </div>
@@ -143,6 +146,21 @@
         </div>
         <button type="button" id="saveStateBtn" class="primary" data-i18n="saveState">Save current state</button>
         <div id="statesList" class="states-list"></div>
+      </div>
+    </div>
+
+    <!-- Export Popup for Mobile -->
+    <div id="exportPopup" class="modal hidden">
+      <div class="modal-content card export-popup-content">
+        <div class="modal-header">
+           <h2 data-i18n="previewAndExport">Preview and Export</h2>
+           <button type="button" id="closeExportPopup" class="close-btn">&times;</button>
+        </div>
+        <div class="export-options">
+          <button type="button" id="exportPdfMobile" class="secondary export-popup-btn" data-i18n="exportPdf">Export PDF</button>
+          <button type="button" id="seePreviewMobile" class="secondary export-popup-btn" data-i18n="seePreview">See Preview</button>
+          <button type="button" id="exportDocxMobile" class="secondary export-popup-btn" data-i18n="exportDocx">Export DOCX</button>
+        </div>
       </div>
     </div>
   </main>

@@ -62,6 +62,7 @@ const translations = {
     tapToEditMetadata: "Tap here to edit title, characters, and argument",
     seeNotes: "See Notes",
     seePreview: "See Preview",
+    previewAndExport: "Preview and Export",
     close: "Close",
     scriptNotes: "Script Notes",
     notesPlaceholder: "Write your internal notes here...",
@@ -82,7 +83,8 @@ const translations = {
     noStates: "No saved states.",
     confirmDelete: "Are you sure you want to delete this state?",
     userLoadingState: "is loading a previous script state. The page will reload.",
-    savedStates: "Saved States"
+    savedStates: "Saved States",
+    blockNotSelected: "Please select a block to add a character dialogue."
   },
   es: {
     appName: "Escritura de Guión Colaborativa",
@@ -126,6 +128,7 @@ const translations = {
     scriptEditor: "Editor de guion",
     formattedPreview: "Vista previa formateada",
     seePreview: "Ver Vista Previa",
+    previewAndExport: "Vista Previa y Exportar",
     close: "Cerrar",
     exportPdf: "Exportar a PDF",
     exportDocx: "Exportar a DOCX",
@@ -167,7 +170,8 @@ const translations = {
     noStates: "No hay estados guardados.",
     confirmDelete: "¿Estás seguro de que quieres eliminar este estado?",
     userLoadingState: "está cargando un estado anterior del guion. La página se recargará.",
-    savedStates: "Estados Guardados"
+    savedStates: "Estados Guardados",
+    blockNotSelected: "Selecciona un bloque para añadir un diálogo de personaje."
   }
 };
 

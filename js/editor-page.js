@@ -259,7 +259,7 @@ function applyCharacterToSelection(character) {
   console.log("Applying character", character, "to active block", activeBlock);
 
   if (!activeBlock) {
-    showPanelNotice("Selecciona un bloque para añadir un personaje.");
+    showPanelNotice(getText(state.language, "blockNotSelected"));
     return;
   }
 
